@@ -117,30 +117,21 @@ if pagina == "Conto Economico":
 
     st.dataframe(df_resultado, use_container_width=True, height=800)
 
-elif pagina == "Stato Patrimoniale + Indicatori":
-    st.title("🏦 Stato Patrimoniale + Indicatori")
-    df = pd.read_excel(uploaded_ce, sheet_name="Stato Patrimoniale")
-    df = df.fillna(0)
-    df.iloc[:, 1:] = df.iloc[:, 1:].applymap(format_miles)
-    st.dataframe(df, use_container_width=True, height=800)
-
 elif pagina == "Rendiconto Finanziario":
     st.title("💧 Rendiconto Finanziario")
     df = pd.read_excel(uploaded_ce, sheet_name="Rendiconto Finanziario")
     df = df.fillna(0)
 
-    if df.shape[1] > 1:
     if df.shape[1] >= 2:
-    prima_colonna = df.columns[0]
-    seconda_colonna = df.columns[1]
+        prima_colonna = df.columns[0]
+        seconda_colonna = df.columns[1]
 
-    try:
-        df[seconda_colonna] = pd.to_numeric(df[seconda_colonna], errors="coerce")
-        df[seconda_colonna] = df[seconda_colonna].apply(format_miles)
-    except Exception as e:
-        st.warning(f"⚠️ Errore nel processamento dei dati numerici: {e}")
-else:
-    st.warning("⚠️ Il foglio 'Rendiconto Finanziario' non ha abbastanza colonne.")
-
+        try:
+            df[seconda_colonna] = pd.to_numeric(df[seconda_colonna], errors="coerce")
+            df[seconda_colonna] = df[seconda_colonna].apply(format_miles)
+        except Exception as e:
+            st.warning(f"⚠️ Errore nel processamento dei dati numerici: {e}")
+    else:
+        st.warning("⚠️ Il foglio 'Rendiconto Finanziario' non ha abbastanza colonne.")
 
     st.dataframe(df, use_container_width=True, height=800)
