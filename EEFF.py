@@ -130,11 +130,17 @@ elif pagina == "Rendiconto Finanziario":
     df = df.fillna(0)
 
     if df.shape[1] > 1:
-        prima_colonna = df.columns[0]
-        df[prima_colonna] = pd.to_numeric(df[prima_colonna], errors='coerce')
-        df = df.sort_values(by=prima_colonna).drop(columns=[prima_colonna])
+    if df.shape[1] >= 2:
+    prima_colonna = df.columns[0]
+    seconda_colonna = df.columns[1]
 
-        col_val = df.columns[1]
-        df[col_val] = df[col_val].apply(format_miles)
+    try:
+        df[seconda_colonna] = pd.to_numeric(df[seconda_colonna], errors="coerce")
+        df[seconda_colonna] = df[seconda_colonna].apply(format_miles)
+    except Exception as e:
+        st.warning(f"⚠️ Errore nel processamento dei dati numerici: {e}")
+else:
+    st.warning("⚠️ Il foglio 'Rendiconto Finanziario' non ha abbastanza colonne.")
+
 
     st.dataframe(df, use_container_width=True, height=800)
