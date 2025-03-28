@@ -1,3 +1,6 @@
+
+
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -11,13 +14,12 @@ uploaded_ce = st.sidebar.file_uploader("Conto_Economico_Budget.xlsx", type=["xls
 uploaded_mappings = st.sidebar.file_uploader("Mappings.xlsx", type=["xlsx"])
 
 if not uploaded_ce or not uploaded_mappings:
-    st.warning("⚠️ Carica tutti e tre i file per continuare.")
+    st.warning("⚠️ Carica tutti e due i file per continuare.")
     st.stop()
 
 # Read Excel files
 conto = pd.read_excel(uploaded_ce, sheet_name="Conto Economico")
 mappings = pd.read_excel(uploaded_mappings, sheet_name="Conto_Economico")
-# Placeholder: you can use this for future features
 
 pagina = st.sidebar.radio("Seleziona la sezione:", [
     "Conto Economico",
@@ -42,7 +44,7 @@ if pagina == "Conto Economico":
     st.title("📘 Conto Economico")
 
     conto = conto.fillna(0)
-    mappings = mappings[["Voce", "Tipo"]]
+    mappings = mappings[["Voce", "Tipo", "ID_Ordine"]]
     df = pd.merge(conto, mappings, on="Voce", how="left")
     df = df.drop_duplicates(subset=["Voce"], keep="first")
 
@@ -56,10 +58,8 @@ if pagina == "Conto Economico":
     with col2:
         periodo_2 = st.selectbox("Periodo 2", periodi, index=index2)
 
-    # Identificar si la cuenta es un coste
     df["is_cost"] = df["Tipo"].str.lower().str.contains("costo|costi|spesa|opex", na=False)
 
-    # Calcular desviación ajustada
     df["Δ"] = np.where(
         df["is_cost"],
         df[periodo_2] - df[periodo_1],
@@ -96,51 +96,36 @@ if pagina == "Conto Economico":
                     periodo_1: row[periodo_1],
                     periodo_2: row[periodo_2],
                     "Δ": row["Δ"],
-                    "Δ %": row["Δ %"]
+                    "Δ %": row["Δ %"],
+                    "ID_Ordine": row.get("ID_Ordine", 9999)
                 }
                 output.append(r)
 
-    kpi_fissi = ["Marginalità Vendite lorda", "EBITDA", "EBIT", "EBT", "Risultato di Gruppo"]
-    kpi_rows = df[df["Voce"].isin(kpi_fissi)].copy()
-    for _, row in kpi_rows.iterrows():
-        r = {
-            "Tipo": row.get("Tipo", ""),
-            "Voce": row["Voce"],
-            periodo_1: row[periodo_1],
-            periodo_2: row[periodo_2],
-            "Δ": row["Δ"],
-            "Δ %": row["Δ %"]
-        }
-        output.append(r)
-
     df_resultado = pd.DataFrame(output)
 
-    # Formato miles
+    # Reemplazar NaN por 9999 en ID_Ordine y ordenar
+    df_resultado["ID_Ordine"] = pd.to_numeric(df_resultado["ID_Ordine"], errors="coerce").fillna(9999)
+    df_resultado = df_resultado.sort_values(by="ID_Ordine").drop(columns=["ID_Ordine"], errors="ignore")
+
     for col in [periodo_1, periodo_2, "Δ"]:
         df_resultado[col] = df_resultado[col].apply(format_miles)
-
     df_resultado["Δ %"] = df_resultado["Δ %"].apply(format_percent)
 
-    # Aplicar colores con emojis a Δ y Δ %
     def colorear(val, tipo, es_porcentaje=False):
         try:
             numero = float(str(val).replace(".", "").replace(",", ".").replace("%", ""))
             if es_porcentaje:
                 numero = numero / 100
-            if tipo:  # coste
+            if tipo:
                 return f"🔴 {val}" if numero > 0 else f"🟢 {val}"
-            else:     # ingreso
+            else:
                 return f"🟢 {val}" if numero > 0 else f"🔴 {val}"
         except:
             return val
 
     df_resultado["is_cost"] = df_resultado["Tipo"].str.lower().str.contains("costo|costi|spesa|opex", na=False)
-    df_resultado["Δ"] = [
-        colorear(v, t) for v, t in zip(df_resultado["Δ"], df_resultado["is_cost"])
-    ]
-    df_resultado["Δ %"] = [
-        colorear(v, t, es_porcentaje=True) for v, t in zip(df_resultado["Δ %"], df_resultado["is_cost"])
-    ]
+    df_resultado["Δ"] = [colorear(v, t) for v, t in zip(df_resultado["Δ"], df_resultado["is_cost"])]
+    df_resultado["Δ %"] = [colorear(v, t, es_porcentaje=True) for v, t in zip(df_resultado["Δ %"], df_resultado["is_cost"])]
     df_resultado = df_resultado.drop(columns=["is_cost"])
 
     if not mostrar_detalles:
@@ -154,27 +139,17 @@ elif pagina == "Stato Patrimoniale + Indicatori":
 
     try:
         df_raw = pd.read_excel(uploaded_ce, sheet_name="Stato Patrimoniale", header=None)
-
         row_idx = df_raw[df_raw.apply(lambda row: row.astype(str).str.contains("Voce", case=False).any(), axis=1)].index
 
         if not row_idx.empty:
             header_row = row_idx[0]
             df_sp = pd.read_excel(uploaded_ce, sheet_name="Stato Patrimoniale", header=header_row)
             df_sp = df_sp.fillna(0)
-
-            # Asignar nombres de años
             col_anno_1 = df_sp.columns[1]
             col_anno_2 = df_sp.columns[2]
-
-            # Calcular diferencia absoluta y %
             df_sp["Δ"] = df_sp[col_anno_2] - df_sp[col_anno_1]
-            df_sp["Δ %"] = np.where(
-                df_sp[col_anno_1] != 0,
-                (df_sp["Δ"] / abs(df_sp[col_anno_1])),
-                np.nan
-            )
+            df_sp["Δ %"] = np.where(df_sp[col_anno_1] != 0, df_sp["Δ"] / abs(df_sp[col_anno_1]), np.nan)
 
-            # Formatear
             df_vis = df_sp.copy()
             for col in [col_anno_1, col_anno_2, "Δ"]:
                 df_vis[col] = df_vis[col].apply(format_miles)
@@ -182,7 +157,6 @@ elif pagina == "Stato Patrimoniale + Indicatori":
 
             st.subheader("📋 Stato Patrimoniale")
             st.dataframe(df_vis, use_container_width=True, height=800)
-
         else:
             st.error("❌ Intestazione 'Voce' non trovata nel foglio 'Stato Patrimoniale'.")
 
@@ -196,9 +170,7 @@ elif pagina == "Rendiconto Finanziario":
     df = df.fillna(0)
 
     if df.shape[1] >= 2:
-        prima_colonna = df.columns[0]
         seconda_colonna = df.columns[1]
-
         try:
             df[seconda_colonna] = pd.to_numeric(df[seconda_colonna], errors="coerce")
             df[seconda_colonna] = df[seconda_colonna].apply(format_miles)
@@ -208,6 +180,3 @@ elif pagina == "Rendiconto Finanziario":
         st.warning("⚠️ Il foglio 'Rendiconto Finanziario' non ha abbastanza colonne.")
 
     st.dataframe(df, use_container_width=True, height=1200)
-
-
-
