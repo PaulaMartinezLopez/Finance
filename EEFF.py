@@ -47,7 +47,7 @@ if pagina == "Conto Economico":
     mappings = mappings[["Voce", "Tipo"]]
    
     df = pd.merge(conto, mappings, on="Voce", how="left")
-df["Tipo"] = df["Tipo"].astype(str).str.strip().replace("nan", np.nan)
+    df["Tipo"] = df["Tipo"].astype(str).str.strip().replace("nan", np.nan)
 
     df = df.drop_duplicates(subset=["Voce"], keep="first")
 
