@@ -11,7 +11,7 @@ uploaded_ce = st.sidebar.file_uploader("Conto_Economico_Budget.xlsx", type=["xls
 uploaded_mappings = st.sidebar.file_uploader("Mappings.xlsx", type=["xlsx"])
 
 if not uploaded_ce or not uploaded_mappings:
-    st.warning("⚠️ Carica tutti e tre i file per continuare.")
+    st.warning("⚠️ Carica tutti e due i file per continuare.")
     st.stop()
 
 # Read Excel files
@@ -57,15 +57,15 @@ if pagina == "Conto Economico":
 
     df["is_cost"] = df["Tipo"].str.lower().str.contains("costo|costi|spesa|opex", na=False)
 
-    df["\u0394"] = np.where(
+    df["Δ"] = np.where(
         df["is_cost"],
         df[periodo_2] - df[periodo_1],
         df[periodo_1] - df[periodo_2]
     )
 
-    df["\u0394 %"] = np.where(
+    df["Δ %"] = np.where(
         df[periodo_2] != 0,
-        df["\u0394"] / abs(df[periodo_2]),
+        df["Δ"] / abs(df[periodo_2]),
         np.nan
     )
 
@@ -74,14 +74,14 @@ if pagina == "Conto Economico":
     output = []
     for tipo in df["Tipo"].dropna().unique():
         subset = df[df["Tipo"] == tipo]
-        total = subset[[periodo_1, periodo_2, "\u0394"]].sum().to_dict()
-        delta_pct = (total["\u0394"] / abs(total[periodo_2])) if total[periodo_2] != 0 else np.nan
+        total = subset[[periodo_1, periodo_2, "Δ"]].sum().to_dict()
+        delta_pct = (total["Δ"] / abs(total[periodo_2])) if total[periodo_2] != 0 else np.nan
         riga_totale = {
             "Tipo": tipo,
             periodo_1: total[periodo_1],
             periodo_2: total[periodo_2],
-            "\u0394": total["\u0394"],
-            "\u0394 %": delta_pct
+            "Δ": total["Δ"],
+            "Δ %": delta_pct
         }
         output.append(riga_totale)
 
@@ -92,30 +92,28 @@ if pagina == "Conto Economico":
                     "Voce": row["Voce"],
                     periodo_1: row[periodo_1],
                     periodo_2: row[periodo_2],
-                    "\u0394": row["\u0394"],
-                    "\u0394 %": row["\u0394 %"]
+                    "Δ": row["Δ"],
+                    "Δ %": row["Δ %"]
                 }
                 output.append(r)
 
-
-
     df_resultado = pd.DataFrame(output)
 
-    # Orden según ID_Ordine
+    # Aplicar orden usando el ID_Ordine
     df_resultado = pd.merge(df_resultado, mappings[["Voce", "ID_Ordine"]], on="Voce", how="left")
     df_resultado = df_resultado.sort_values(by="ID_Ordine").drop(columns=["ID_Ordine"])
 
-    for col in [periodo_1, periodo_2, "\u0394"]:
+    # Formato miles y porcentaje
+    for col in [periodo_1, periodo_2, "Δ"]:
         df_resultado[col] = df_resultado[col].apply(format_miles)
-
-    df_resultado["\u0394 %"] = df_resultado["\u0394 %"].apply(format_percent)
+    df_resultado["Δ %"] = df_resultado["Δ %"].apply(format_percent)
 
     def colorear(val, tipo, es_porcentaje=False):
         try:
             numero = float(str(val).replace(".", "").replace(",", ".").replace("%", ""))
             if es_porcentaje:
                 numero = numero / 100
-            if tipo:
+            if tipo:  # coste
                 return f"🔴 {val}" if numero > 0 else f"🟢 {val}"
             else:
                 return f"🟢 {val}" if numero > 0 else f"🔴 {val}"
@@ -123,8 +121,12 @@ if pagina == "Conto Economico":
             return val
 
     df_resultado["is_cost"] = df_resultado["Tipo"].str.lower().str.contains("costo|costi|spesa|opex", na=False)
-    df_resultado["Δ"] = [colorear(v, t) for v, t in zip(df_resultado["Δ"], df_resultado["is_cost"])]
-    df_resultado["Δ %"] = [colorear(v, t, es_porcentaje=True) for v, t in zip(df_resultado["Δ %"], df_resultado["is_cost"])]
+    df_resultado["Δ"] = [
+        colorear(v, t) for v, t in zip(df_resultado["Δ"], df_resultado["is_cost"])
+    ]
+    df_resultado["Δ %"] = [
+        colorear(v, t, es_porcentaje=True) for v, t in zip(df_resultado["Δ %"], df_resultado["is_cost"])
+    ]
     df_resultado = df_resultado.drop(columns=["is_cost"])
 
     if not mostrar_detalles:
@@ -162,7 +164,6 @@ elif pagina == "Stato Patrimoniale + Indicatori":
 
             st.subheader("📋 Stato Patrimoniale")
             st.dataframe(df_vis, use_container_width=True, height=800)
-
         else:
             st.error("❌ Intestazione 'Voce' non trovata nel foglio 'Stato Patrimoniale'.")
 
@@ -176,9 +177,7 @@ elif pagina == "Rendiconto Finanziario":
     df = df.fillna(0)
 
     if df.shape[1] >= 2:
-        prima_colonna = df.columns[0]
         seconda_colonna = df.columns[1]
-
         try:
             df[seconda_colonna] = pd.to_numeric(df[seconda_colonna], errors="coerce")
             df[seconda_colonna] = df[seconda_colonna].apply(format_miles)
