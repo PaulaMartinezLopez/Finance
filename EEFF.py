@@ -47,7 +47,7 @@ if pagina == "Conto Economico":
     mappings = mappings[["Voce", "Tipo"]]
     df = pd.merge(conto, mappings, on="Voce", how="left")
 
-    # Limpieza de espacios invisibles en Tipo
+    # Limpieza de Tipo
     df["Tipo"] = df["Tipo"].astype(str).str.strip().replace("nan", np.nan)
     df = df.drop_duplicates(subset=["Voce"], keep="first")
 
@@ -61,10 +61,8 @@ if pagina == "Conto Economico":
     with col2:
         periodo_2 = st.selectbox("Periodo 2", periodi, index=index2)
 
-    # Identificar si es coste
     df["is_cost"] = df["Tipo"].str.lower().str.contains("costo|costi|spesa|opex", na=False)
 
-    # Desviaciones corregidas
     df["Δ"] = np.where(
         df["is_cost"],
         df[periodo_2] - df[periodo_1],
@@ -105,7 +103,7 @@ if pagina == "Conto Economico":
                 }
                 output.append(r)
 
-    # Agrega los KPI fissi si no se duplican
+    # KPI fissi si no están ya
     kpi_fissi = ["Marginalità Vendite lorda", "EBITDA", "EBIT", "EBT", "Risultato di Gruppo"]
     kpi_rows = df[df["Voce"].isin(kpi_fissi) & ~df["Voce"].isin([r.get("Voce") for r in output])].copy()
     for _, row in kpi_rows.iterrows():
@@ -121,7 +119,7 @@ if pagina == "Conto Economico":
 
     df_resultado = pd.DataFrame(output)
 
-    # Ordenar según el Excel original
+    # Aplicar orden según el Excel original (antes de borrar Voce)
     orden_excel = conto["Voce"].tolist()
     df_resultado["__ordine__"] = df_resultado["Voce"].apply(lambda x: orden_excel.index(x) if x in orden_excel else 9999)
     df_resultado = df_resultado.sort_values(by="__ordine__").drop(columns="__ordine__")
@@ -131,32 +129,29 @@ if pagina == "Conto Economico":
         df_resultado[col] = df_resultado[col].apply(format_miles)
     df_resultado["Δ %"] = df_resultado["Δ %"].apply(format_percent)
 
-    # Añadir emojis como "semáforo" visual
+    # Semáforo visual con emojis
     def colorear(val, tipo, es_porcentaje=False):
         try:
             numero = float(str(val).replace(".", "").replace(",", ".").replace("%", ""))
             if es_porcentaje:
                 numero = numero / 100
-            if tipo:  # coste
+            if tipo:
                 return f"🔴 {val}" if numero > 0 else f"🟢 {val}"
-            else:     # ingreso
+            else:
                 return f"🟢 {val}" if numero > 0 else f"🔴 {val}"
         except:
             return val
 
     df_resultado["is_cost"] = df_resultado["Tipo"].str.lower().str.contains("costo|costi|spesa|opex", na=False)
-    df_resultado["Δ"] = [
-        colorear(v, t) for v, t in zip(df_resultado["Δ"], df_resultado["is_cost"])
-    ]
-    df_resultado["Δ %"] = [
-        colorear(v, t, es_porcentaje=True) for v, t in zip(df_resultado["Δ %"], df_resultado["is_cost"])
-    ]
+    df_resultado["Δ"] = [colorear(v, t) for v, t in zip(df_resultado["Δ"], df_resultado["is_cost"])]
+    df_resultado["Δ %"] = [colorear(v, t, es_porcentaje=True) for v, t in zip(df_resultado["Δ %"], df_resultado["is_cost"])]
     df_resultado = df_resultado.drop(columns=["is_cost"])
 
-    # Ocultar columna Voce si no se muestran detalles
+    # Quitar columna Voce si no hay detalles
     if not mostrar_detalles:
         df_resultado = df_resultado.drop(columns=["Voce"], errors="ignore")
 
+    # Mostrar tabla final
     st.dataframe(df_resultado, use_container_width=True, height=1200)
 
 # === STATO PATRIMONIALE ===
