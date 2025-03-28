@@ -43,7 +43,7 @@ if pagina == "Conto Economico":
     st.title("📘 Conto Economico")
 
     conto = conto.fillna(0)
-    mappings = mappings[["Voce", "Tipo"]]
+    mappings = mappings[["Voce", "Tipo", "ID_Ordine"]]
     df = pd.merge(conto, mappings, on="Voce", how="left")
     df = df.drop_duplicates(subset=["Voce"], keep="first")
 
@@ -146,6 +146,11 @@ if pagina == "Conto Economico":
 
     if not mostrar_detalles:
         df_resultado = df_resultado.drop(columns=["Voce"], errors="ignore")
+    # Aplicar orden según ID_Ordine del mapping
+
+    df_resultado = pd.merge(df_resultado, mappings[["Voce", "ID_Ordine"]], on="Voce", how="left")
+    df_resultado = df_resultado.sort_values(by="ID_Ordine").drop(columns=["ID_Ordine"])
+
 
     st.dataframe(df_resultado, use_container_width=True, height=1400)
 
