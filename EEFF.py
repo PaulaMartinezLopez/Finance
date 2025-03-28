@@ -18,7 +18,7 @@ if not uploaded_ce or not uploaded_mappings:
 conto = pd.read_excel(uploaded_ce, sheet_name="Conto Economico")
 mappings = pd.read_excel(uploaded_mappings, sheet_name="Conto_Economico")
 # Placeholder: you can use this for future features
-output_design = pd.read_excel(uploaded_output, sheet_name=0)
+
 
 pagina = st.sidebar.radio("Seleziona la sezione:", [
     "Conto Economico",
