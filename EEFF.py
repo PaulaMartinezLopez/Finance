@@ -97,18 +97,7 @@ if pagina == "Conto Economico":
                 }
                 output.append(r)
 
-    kpi_fissi = ["Marginalità Vendite lorda", "EBITDA", "EBIT", "EBT", "Risultato di Gruppo"]
-    kpi_rows = df[df["Voce"].isin(kpi_fissi)].copy()
-    for _, row in kpi_rows.iterrows():
-        r = {
-            "Tipo": row.get("Tipo", ""),
-            "Voce": row["Voce"],
-            periodo_1: row[periodo_1],
-            periodo_2: row[periodo_2],
-            "\u0394": row["\u0394"],
-            "\u0394 %": row["\u0394 %"]
-        }
-        output.append(r)
+
 
     df_resultado = pd.DataFrame(output)
 
