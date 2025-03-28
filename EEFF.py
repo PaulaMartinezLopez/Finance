@@ -209,5 +209,14 @@ elif pagina == "Rendiconto Finanziario":
     else:
         st.warning("⚠️ Il foglio 'Rendiconto Finanziario' non ha abbastanza colonne.")
 
+    # Obtener orden original desde el archivo Excel (hoja Conto Economico)
+orden_excel = conto["Voce"].tolist()
+
+# Crear una columna auxiliar temporal con el orden original
+df_resultado["__ordine__"] = df_resultado["Voce"].apply(lambda x: orden_excel.index(x) if x in orden_excel else 9999)
+
+# Reordenar
+df_resultado = df_resultado.sort_values(by="__ordine__").drop(columns="__ordine__")
+
     st.dataframe(df, use_container_width=True, height=1400)
 
