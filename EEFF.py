@@ -45,10 +45,10 @@ if pagina == "Conto Economico":
 
     conto = conto.fillna(0)
     mappings = mappings[["Voce", "Tipo"]]
-   
     df = pd.merge(conto, mappings, on="Voce", how="left")
-    df["Tipo"] = df["Tipo"].astype(str).str.strip().replace("nan", np.nan)
 
+    # Limpieza de espacios invisibles en Tipo
+    df["Tipo"] = df["Tipo"].astype(str).str.strip().replace("nan", np.nan)
     df = df.drop_duplicates(subset=["Voce"], keep="first")
 
     periodi = list(conto.columns[1:4])
@@ -61,10 +61,10 @@ if pagina == "Conto Economico":
     with col2:
         periodo_2 = st.selectbox("Periodo 2", periodi, index=index2)
 
-    # Identificar si la cuenta es un coste
+    # Identificar si es coste
     df["is_cost"] = df["Tipo"].str.lower().str.contains("costo|costi|spesa|opex", na=False)
 
-    # Calcular desviación ajustada
+    # Desviaciones corregidas
     df["Δ"] = np.where(
         df["is_cost"],
         df[periodo_2] - df[periodo_1],
@@ -105,8 +105,9 @@ if pagina == "Conto Economico":
                 }
                 output.append(r)
 
+    # Agrega los KPI fissi si no se duplican
     kpi_fissi = ["Marginalità Vendite lorda", "EBITDA", "EBIT", "EBT", "Risultato di Gruppo"]
-    kpi_rows = df[df["Voce"].isin(kpi_fissi)].copy()
+    kpi_rows = df[df["Voce"].isin(kpi_fissi) & ~df["Voce"].isin([r.get("Voce") for r in output])].copy()
     for _, row in kpi_rows.iterrows():
         r = {
             "Tipo": row.get("Tipo", ""),
@@ -120,13 +121,17 @@ if pagina == "Conto Economico":
 
     df_resultado = pd.DataFrame(output)
 
-    # Formato miles
+    # Ordenar según el Excel original
+    orden_excel = conto["Voce"].tolist()
+    df_resultado["__ordine__"] = df_resultado["Voce"].apply(lambda x: orden_excel.index(x) if x in orden_excel else 9999)
+    df_resultado = df_resultado.sort_values(by="__ordine__").drop(columns="__ordine__")
+
+    # Formato miles y porcentaje
     for col in [periodo_1, periodo_2, "Δ"]:
         df_resultado[col] = df_resultado[col].apply(format_miles)
-
     df_resultado["Δ %"] = df_resultado["Δ %"].apply(format_percent)
 
-    # Aplicar colores con emojis a Δ y Δ %
+    # Añadir emojis como "semáforo" visual
     def colorear(val, tipo, es_porcentaje=False):
         try:
             numero = float(str(val).replace(".", "").replace(",", ".").replace("%", ""))
@@ -148,10 +153,11 @@ if pagina == "Conto Economico":
     ]
     df_resultado = df_resultado.drop(columns=["is_cost"])
 
+    # Ocultar columna Voce si no se muestran detalles
     if not mostrar_detalles:
         df_resultado = df_resultado.drop(columns=["Voce"], errors="ignore")
 
-    st.dataframe(df_resultado, use_container_width=True, height=800)
+    st.dataframe(df_resultado, use_container_width=True, height=1200)
 
 # === STATO PATRIMONIALE ===
 elif pagina == "Stato Patrimoniale + Indicatori":
