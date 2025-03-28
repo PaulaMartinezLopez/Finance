@@ -123,10 +123,8 @@ elif pagina == "Stato Patrimoniale + Indicatori":
     st.title("🏦 Stato Patrimoniale")
 
     try:
-        # Leer hoja sin encabezado para detectar la fila con "Voce"
         df_raw = pd.read_excel(uploaded_ce, sheet_name="Stato Patrimoniale", header=None)
 
-        # Buscar la fila que contiene "Voce"
         row_idx = df_raw[df_raw.apply(lambda row: row.astype(str).str.contains("Voce", case=False).any(), axis=1)].index
 
         if not row_idx.empty:
@@ -134,10 +132,23 @@ elif pagina == "Stato Patrimoniale + Indicatori":
             df_sp = pd.read_excel(uploaded_ce, sheet_name="Stato Patrimoniale", header=header_row)
             df_sp = df_sp.fillna(0)
 
-            # Aplicar formato miles a todas las columnas excepto la primera
+            # Asignar nombres de años
+            col_anno_1 = df_sp.columns[1]
+            col_anno_2 = df_sp.columns[2]
+
+            # Calcular diferencia absoluta y %
+            df_sp["Δ"] = df_sp[col_anno_2] - df_sp[col_anno_1]
+            df_sp["Δ %"] = np.where(
+                df_sp[col_anno_1] != 0,
+                (df_sp["Δ"] / abs(df_sp[col_anno_1])),
+                np.nan
+            )
+
+            # Formatear
             df_vis = df_sp.copy()
-            for col in df_vis.columns[1:]:
+            for col in [col_anno_1, col_anno_2, "Δ"]:
                 df_vis[col] = df_vis[col].apply(format_miles)
+            df_vis["Δ %"] = df_vis["Δ %"].apply(format_percent)
 
             st.subheader("📋 Stato Patrimoniale")
             st.dataframe(df_vis, use_container_width=True, height=800)
