@@ -39,7 +39,7 @@ def format_percent(x):
     except:
         return x
 
-# === CONTABILITÀ ECONOMICA ===
+# === CONTO ECONOMICO ===
 if pagina == "Conto Economico":
     st.title("📘 Conto Economico")
 
@@ -58,10 +58,19 @@ if pagina == "Conto Economico":
     with col2:
         periodo_2 = st.selectbox("Periodo 2", periodi, index=index2)
 
-    df["Δ"] = df[periodo_1] - df[periodo_2]
+    # Identificar si la cuenta es un coste
+    df["is_cost"] = df["Tipo"].str.lower().str.contains("costo|costi|spesa|opex", na=False)
+
+    # Calcular desviación ajustada
+    df["Δ"] = np.where(
+        df["is_cost"],
+        df[periodo_2] - df[periodo_1],
+        df[periodo_1] - df[periodo_2]
+    )
+
     df["Δ %"] = np.where(
         df[periodo_2] != 0,
-        (df[periodo_1] - df[periodo_2]) / abs(df[periodo_2]),
+        df["Δ"] / abs(df[periodo_2]),
         np.nan
     )
 
@@ -94,10 +103,10 @@ if pagina == "Conto Economico":
                 output.append(r)
 
     kpi_fissi = ["Marginalità Vendite lorda", "EBITDA", "EBIT", "EBT", "Risultato di Gruppo"]
-    kpi_rows = df[df["Voce"].isin(kpi_fissi) & df["Tipo"].isna()].copy()
+    kpi_rows = df[df["Voce"].isin(kpi_fissi)].copy()
     for _, row in kpi_rows.iterrows():
         r = {
-            "Tipo": "",
+            "Tipo": row.get("Tipo", ""),
             "Voce": row["Voce"],
             periodo_1: row[periodo_1],
             periodo_2: row[periodo_2],
@@ -108,10 +117,33 @@ if pagina == "Conto Economico":
 
     df_resultado = pd.DataFrame(output)
 
+    # Formato miles
     for col in [periodo_1, periodo_2, "Δ"]:
         df_resultado[col] = df_resultado[col].apply(format_miles)
 
     df_resultado["Δ %"] = df_resultado["Δ %"].apply(format_percent)
+
+    # Aplicar colores con emojis a Δ y Δ %
+    def colorear(val, tipo, es_porcentaje=False):
+        try:
+            numero = float(str(val).replace(".", "").replace(",", ".").replace("%", ""))
+            if es_porcentaje:
+                numero = numero / 100
+            if tipo:  # coste
+                return f"🔴 {val}" if numero > 0 else f"🟢 {val}"
+            else:     # ingreso
+                return f"🟢 {val}" if numero > 0 else f"🔴 {val}"
+        except:
+            return val
+
+    df_resultado["is_cost"] = df_resultado["Tipo"].str.lower().str.contains("costo|costi|spesa|opex", na=False)
+    df_resultado["Δ"] = [
+        colorear(v, t) for v, t in zip(df_resultado["Δ"], df_resultado["is_cost"])
+    ]
+    df_resultado["Δ %"] = [
+        colorear(v, t, es_porcentaje=True) for v, t in zip(df_resultado["Δ %"], df_resultado["is_cost"])
+    ]
+    df_resultado = df_resultado.drop(columns=["is_cost"])
 
     if not mostrar_detalles:
         df_resultado = df_resultado.drop(columns=["Voce"], errors="ignore")
