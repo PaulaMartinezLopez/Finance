@@ -209,5 +209,5 @@ elif pagina == "Rendiconto Finanziario":
     else:
         st.warning("⚠️ Il foglio 'Rendiconto Finanziario' non ha abbastanza colonne.")
 
-    st.dataframe(df, use_container_width=True, height=800)
+    st.dataframe(df, use_container_width=True, height=1200)
 
