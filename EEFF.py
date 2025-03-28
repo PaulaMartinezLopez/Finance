@@ -220,6 +220,8 @@ df_resultado["__ordine__"] = df_resultado["Voce"].apply(lambda x: orden_excel.in
 
 # Reordenar
 df_resultado = df_resultado.sort_values(by="__ordine__").drop(columns="__ordine__")
+st.dataframe(df, use_container_width=True, height=1400)
 
-    st.dataframe(df, use_container_width=True, height=1400)
+
+  
 
