@@ -9,17 +9,17 @@ st.sidebar.title("📊 Navigazione")
 st.sidebar.subheader("Carica i file Excel")
 uploaded_ce = st.sidebar.file_uploader("Conto_Economico_Budget.xlsx", type=["xlsx"])
 uploaded_mappings = st.sidebar.file_uploader("Mappings.xlsx", type=["xlsx"])
+uploaded_output = st.sidebar.file_uploader("Output design.xlsx", type=["xlsx"])
 
-
-if not uploaded_ce or not uploaded_mappings:
-    st.warning("⚠️ Carica tutte due file per continuare.")
+if not uploaded_ce or not uploaded_mappings or not uploaded_output:
+    st.warning("⚠️ Carica tutti e tre i file per continuare.")
     st.stop()
 
 # Read Excel files
 conto = pd.read_excel(uploaded_ce, sheet_name="Conto Economico")
 mappings = pd.read_excel(uploaded_mappings, sheet_name="Conto_Economico")
 # Placeholder: you can use this for future features
-
+output_design = pd.read_excel(uploaded_output, sheet_name=0)
 
 pagina = st.sidebar.radio("Seleziona la sezione:", [
     "Conto Economico",
@@ -46,9 +46,6 @@ if pagina == "Conto Economico":
     conto = conto.fillna(0)
     mappings = mappings[["Voce", "Tipo"]]
     df = pd.merge(conto, mappings, on="Voce", how="left")
-
-    # Limpieza de Tipo
-    df["Tipo"] = df["Tipo"].astype(str).str.strip().replace("nan", np.nan)
     df = df.drop_duplicates(subset=["Voce"], keep="first")
 
     periodi = list(conto.columns[1:4])
@@ -61,8 +58,10 @@ if pagina == "Conto Economico":
     with col2:
         periodo_2 = st.selectbox("Periodo 2", periodi, index=index2)
 
+    # Identificar si la cuenta es un coste
     df["is_cost"] = df["Tipo"].str.lower().str.contains("costo|costi|spesa|opex", na=False)
 
+    # Calcular desviación ajustada
     df["Δ"] = np.where(
         df["is_cost"],
         df[periodo_2] - df[periodo_1],
@@ -103,9 +102,8 @@ if pagina == "Conto Economico":
                 }
                 output.append(r)
 
-    # KPI fissi si no están ya
     kpi_fissi = ["Marginalità Vendite lorda", "EBITDA", "EBIT", "EBT", "Risultato di Gruppo"]
-    kpi_rows = df[df["Voce"].isin(kpi_fissi) & ~df["Voce"].isin([r.get("Voce") for r in output])].copy()
+    kpi_rows = df[df["Voce"].isin(kpi_fissi)].copy()
     for _, row in kpi_rows.iterrows():
         r = {
             "Tipo": row.get("Tipo", ""),
@@ -119,40 +117,38 @@ if pagina == "Conto Economico":
 
     df_resultado = pd.DataFrame(output)
 
-    # Aplicar orden según el Excel original (antes de borrar Voce)
-    orden_excel = conto["Voce"].tolist()
-    df_resultado["__ordine__"] = df_resultado["Voce"].apply(lambda x: orden_excel.index(x) if x in orden_excel else 9999)
-    df_resultado = df_resultado.sort_values(by="__ordine__").drop(columns="__ordine__")
-
-    # Formato miles y porcentaje
+    # Formato miles
     for col in [periodo_1, periodo_2, "Δ"]:
         df_resultado[col] = df_resultado[col].apply(format_miles)
+
     df_resultado["Δ %"] = df_resultado["Δ %"].apply(format_percent)
 
-    # Semáforo visual con emojis
+    # Aplicar colores con emojis a Δ y Δ %
     def colorear(val, tipo, es_porcentaje=False):
         try:
             numero = float(str(val).replace(".", "").replace(",", ".").replace("%", ""))
             if es_porcentaje:
                 numero = numero / 100
-            if tipo:
+            if tipo:  # coste
                 return f"🔴 {val}" if numero > 0 else f"🟢 {val}"
-            else:
+            else:     # ingreso
                 return f"🟢 {val}" if numero > 0 else f"🔴 {val}"
         except:
             return val
 
     df_resultado["is_cost"] = df_resultado["Tipo"].str.lower().str.contains("costo|costi|spesa|opex", na=False)
-    df_resultado["Δ"] = [colorear(v, t) for v, t in zip(df_resultado["Δ"], df_resultado["is_cost"])]
-    df_resultado["Δ %"] = [colorear(v, t, es_porcentaje=True) for v, t in zip(df_resultado["Δ %"], df_resultado["is_cost"])]
+    df_resultado["Δ"] = [
+        colorear(v, t) for v, t in zip(df_resultado["Δ"], df_resultado["is_cost"])
+    ]
+    df_resultado["Δ %"] = [
+        colorear(v, t, es_porcentaje=True) for v, t in zip(df_resultado["Δ %"], df_resultado["is_cost"])
+    ]
     df_resultado = df_resultado.drop(columns=["is_cost"])
 
-    # Quitar columna Voce si no hay detalles
     if not mostrar_detalles:
         df_resultado = df_resultado.drop(columns=["Voce"], errors="ignore")
 
-    # Mostrar tabla final
-    st.dataframe(df_resultado, use_container_width=True, height=1200)
+    st.dataframe(df_resultado, use_container_width=True, height=1400)
 
 # === STATO PATRIMONIALE ===
 elif pagina == "Stato Patrimoniale + Indicatori":
@@ -213,16 +209,7 @@ elif pagina == "Rendiconto Finanziario":
     else:
         st.warning("⚠️ Il foglio 'Rendiconto Finanziario' non ha abbastanza colonne.")
 
-    # Obtener orden original desde el archivo Excel (hoja Conto Economico)
-orden_excel = conto["Voce"].tolist()
-
-# Crear una columna auxiliar temporal con el orden original
-df_resultado["__ordine__"] = df_resultado["Voce"].apply(lambda x: orden_excel.index(x) if x in orden_excel else 9999)
-
-# Reordenar
-df_resultado = df_resultado.sort_values(by="__ordine__").drop(columns="__ordine__")
-st.dataframe(df, use_container_width=True, height=1400)
-
+    st.dataframe(df, use_container_width=True, height=1200)
 
   
 
