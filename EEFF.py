@@ -39,6 +39,7 @@ def format_percent(x):
     except:
         return x
 
+# === CONTABILITÀ ECONOMICA ===
 if pagina == "Conto Economico":
     st.title("📘 Conto Economico")
 
@@ -117,6 +118,37 @@ if pagina == "Conto Economico":
 
     st.dataframe(df_resultado, use_container_width=True, height=800)
 
+# === STATO PATRIMONIALE ===
+elif pagina == "Stato Patrimoniale + Indicatori":
+    st.title("🏦 Stato Patrimoniale")
+
+    try:
+        # Leer hoja sin encabezado para detectar la fila con "Voce"
+        df_raw = pd.read_excel(uploaded_ce, sheet_name="Stato Patrimoniale", header=None)
+
+        # Buscar la fila que contiene "Voce"
+        row_idx = df_raw[df_raw.apply(lambda row: row.astype(str).str.contains("Voce", case=False).any(), axis=1)].index
+
+        if not row_idx.empty:
+            header_row = row_idx[0]
+            df_sp = pd.read_excel(uploaded_ce, sheet_name="Stato Patrimoniale", header=header_row)
+            df_sp = df_sp.fillna(0)
+
+            # Aplicar formato miles a todas las columnas excepto la primera
+            df_vis = df_sp.copy()
+            for col in df_vis.columns[1:]:
+                df_vis[col] = df_vis[col].apply(format_miles)
+
+            st.subheader("📋 Stato Patrimoniale")
+            st.dataframe(df_vis, use_container_width=True, height=800)
+
+        else:
+            st.error("❌ Intestazione 'Voce' non trovata nel foglio 'Stato Patrimoniale'.")
+
+    except Exception as e:
+        st.error(f"❌ Errore nel caricamento del 'Stato Patrimoniale': {e}")
+
+# === RENDICONTO FINANZIARIO ===
 elif pagina == "Rendiconto Finanziario":
     st.title("💧 Rendiconto Finanziario")
     df = pd.read_excel(uploaded_ce, sheet_name="Rendiconto Finanziario")
@@ -135,3 +167,4 @@ elif pagina == "Rendiconto Finanziario":
         st.warning("⚠️ Il foglio 'Rendiconto Finanziario' non ha abbastanza colonne.")
 
     st.dataframe(df, use_container_width=True, height=800)
+
