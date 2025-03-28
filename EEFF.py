@@ -9,17 +9,17 @@ st.sidebar.title("📊 Navigazione")
 st.sidebar.subheader("Carica i file Excel")
 uploaded_ce = st.sidebar.file_uploader("Conto_Economico_Budget.xlsx", type=["xlsx"])
 uploaded_mappings = st.sidebar.file_uploader("Mappings.xlsx", type=["xlsx"])
-uploaded_output = st.sidebar.file_uploader("Output design.xlsx", type=["xlsx"])
 
-if not uploaded_ce or not uploaded_mappings or not uploaded_output:
-    st.warning("⚠️ Carica tutti e tre i file per continuare.")
+
+if not uploaded_ce or not uploaded_mappings:
+    st.warning("⚠️ Carica tutte due file per continuare.")
     st.stop()
 
 # Read Excel files
 conto = pd.read_excel(uploaded_ce, sheet_name="Conto Economico")
 mappings = pd.read_excel(uploaded_mappings, sheet_name="Conto_Economico")
 # Placeholder: you can use this for future features
-output_design = pd.read_excel(uploaded_output, sheet_name=0)
+
 
 pagina = st.sidebar.radio("Seleziona la sezione:", [
     "Conto Economico",
