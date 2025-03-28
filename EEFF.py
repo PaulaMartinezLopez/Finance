@@ -9,9 +9,8 @@ st.sidebar.title("📊 Navigazione")
 st.sidebar.subheader("Carica i file Excel")
 uploaded_ce = st.sidebar.file_uploader("Conto_Economico_Budget.xlsx", type=["xlsx"])
 uploaded_mappings = st.sidebar.file_uploader("Mappings.xlsx", type=["xlsx"])
-uploaded_output = st.sidebar.file_uploader("Output design.xlsx", type=["xlsx"])
 
-if not uploaded_ce or not uploaded_mappings or not uploaded_output:
+if not uploaded_ce or not uploaded_mappings:
     st.warning("⚠️ Carica tutti e tre i file per continuare.")
     st.stop()
 
@@ -211,5 +210,4 @@ elif pagina == "Rendiconto Finanziario":
 
     st.dataframe(df, use_container_width=True, height=1200)
 
-  
 
