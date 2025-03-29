@@ -1,8 +1,7 @@
+
 import streamlit as st
 import pandas as pd
 import numpy as np
-from st_aggrid import AgGrid, GridOptionsBuilder
-
 
 st.set_page_config(layout="wide")
 st.sidebar.title("📊 Navigazione")
@@ -37,7 +36,8 @@ def format_percent(x):
 if pagina == "Conto Economico":
     st.title("📘 Conto Economico")
 
-    conto = conto.fillna(0)
+    conto = pd.read_excel(uploaded_ce, sheet_name="Conto Economico").fillna(0)
+
     periodi = list(conto.columns[1:4])
     index1 = 2 if len(periodi) > 2 else len(periodi) - 1
     index2 = 1 if len(periodi) > 1 else 0
@@ -94,15 +94,11 @@ if pagina == "Conto Economico":
 
     df_resultado = pd.DataFrame(output)
 
+    # Ordenar por ID_Ordine del archivo Excel
     if "Voce" in df_resultado.columns and "ID_Ordine" in df.columns:
         orden_dict = df.set_index("Voce")["ID_Ordine"].to_dict()
         df_resultado["__ordine__"] = df_resultado["Voce"].map(orden_dict)
         df_resultado = df_resultado.sort_values(by="__ordine__", na_position="last").drop(columns="__ordine__")
-
-    df_resultado["is_cost"] = df_resultado["Tipo"].str.lower().str.contains("costo|costi|spesa|opex", na=False)
-    for col in [periodo_1, periodo_2, "Δ"]:
-        df_resultado[col] = df_resultado[col].apply(format_miles)
-    df_resultado["Δ %"] = df_resultado["Δ %"].apply(format_percent)
 
     def colorear(val, tipo, es_porcentaje=False):
         try:
@@ -116,6 +112,11 @@ if pagina == "Conto Economico":
         except:
             return val
 
+    df_resultado["is_cost"] = df_resultado["Tipo"].str.lower().str.contains("costo|costi|spesa|opex", na=False)
+    for col in [periodo_1, periodo_2, "Δ"]:
+        df_resultado[col] = df_resultado[col].apply(format_miles)
+    df_resultado["Δ %"] = df_resultado["Δ %"].apply(format_percent)
+
     df_resultado["Δ"] = [
         colorear(v, t) for v, t in zip(df_resultado["Δ"], df_resultado["is_cost"])
     ]
@@ -127,13 +128,7 @@ if pagina == "Conto Economico":
     if not mostrar_detalles:
         df_resultado = df_resultado.drop(columns=["Voce"], errors="ignore")
 
-    # Mostrar con AgGrid con estilos
-    gb = GridOptionsBuilder.from_dataframe(df_resultado)
-    gb.configure_default_column(resizable=True, wrapText=True, autoHeight=True)
-    gb.configure_grid_options(domLayout='normal')
-    gridOptions = gb.build()
-
-    AgGrid(df_resultado, gridOptions=gridOptions, height=1000, fit_columns_on_grid_load=True)
+    st.dataframe(df_resultado, use_container_width=True, height=1400)
 
 elif pagina == "Stato Patrimoniale + Indicatori":
     st.title("🏦 Stato Patrimoniale")
@@ -167,9 +162,11 @@ elif pagina == "Stato Patrimoniale + Indicatori":
 
 elif pagina == "Rendiconto Finanziario":
     st.title("💧 Rendiconto Finanziario")
-    df = pd.read_excel(uploaded_ce, sheet_name="Rendiconto Finanziario").fillna(0)
+    df = pd.read_excel(uploaded_ce, sheet_name="Rendiconto Finanziario")
+    df = df.fillna(0)
 
     if df.shape[1] >= 2:
+        prima_colonna = df.columns[0]
         seconda_colonna = df.columns[1]
         try:
             df[seconda_colonna] = pd.to_numeric(df[seconda_colonna], errors="coerce")
