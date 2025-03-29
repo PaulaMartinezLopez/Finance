@@ -10,11 +10,12 @@ st.sidebar.subheader("Carica i file Excel")
 uploaded_ce = st.sidebar.file_uploader("Conto_Economico_Budget.xlsx", type=["xlsx"])
 
 if not uploaded_ce:
-    st.warning("⚠️ Carica il file Conto_Economico_Budget.xlsx per continuare.")
+    st.warning("⚠️ Carica il file Excel per continuare.")
     st.stop()
 
 # Read Excel file
 conto = pd.read_excel(uploaded_ce, sheet_name="Conto Economico")
+
 pagina = st.sidebar.radio("Seleziona la sezione:", [
     "Conto Economico",
     "Stato Patrimoniale + Indicatori",
@@ -48,36 +49,32 @@ if pagina == "Conto Economico":
     with col2:
         periodo_2 = st.selectbox("Periodo 2", periodi, index=index2)
 
-    df = conto.copy()
-    df["is_cost"] = df["Tipo"].str.lower().str.contains("costo|costi|spesa|opex", na=False)
-
-    df["Δ"] = np.where(
-        df["is_cost"],
-        df[periodo_2] - df[periodo_1],
-        df[periodo_1] - df[periodo_2]
+    conto["is_cost"] = conto["Tipo"].str.lower().str.contains("costo|costi|spesa|opex", na=False)
+    conto["Δ"] = np.where(
+        conto["is_cost"],
+        conto[periodo_2] - conto[periodo_1],
+        conto[periodo_1] - conto[periodo_2]
     )
-
-    df["Δ %"] = np.where(
-        df[periodo_2] != 0,
-        df["Δ"] / abs(df[periodo_2]),
+    conto["Δ %"] = np.where(
+        conto[periodo_2] != 0,
+        conto["Δ"] / abs(conto[periodo_2]),
         np.nan
     )
 
     mostrar_detalles = st.checkbox("Mostrar dettagli", value=False)
 
     output = []
-    for tipo in df["Tipo"].dropna().unique():
-        subset = df[df["Tipo"] == tipo]
+    for tipo in conto["Tipo"].dropna().unique():
+        subset = conto[conto["Tipo"] == tipo]
         total = subset[[periodo_1, periodo_2, "Δ"]].sum().to_dict()
         delta_pct = (total["Δ"] / abs(total[periodo_2])) if total[periodo_2] != 0 else np.nan
         riga_totale = {
             "Tipo": tipo,
-            "Voce": tipo,
+            "Voce": "",
             periodo_1: total[periodo_1],
             periodo_2: total[periodo_2],
             "Δ": total["Δ"],
-            "Δ %": delta_pct,
-            "_dettaglio": False
+            "Δ %": delta_pct
         }
         output.append(riga_totale)
 
@@ -89,32 +86,28 @@ if pagina == "Conto Economico":
                     periodo_1: row[periodo_1],
                     periodo_2: row[periodo_2],
                     "Δ": row["Δ"],
-                    "Δ %": row["Δ %"],
-                    "_dettaglio": True
+                    "Δ %": row["Δ %"]
                 }
                 output.append(r)
 
     df_resultado = pd.DataFrame(output)
+    df_resultado["__ordine__"] = conto.set_index("Voce").loc[df_resultado["Voce"].fillna("")].reindex(df_resultado.index).get("ID_Ordine", 9999).fillna(9999)
+    df_resultado = df_resultado.sort_values(by="__ordine__").drop(columns="__ordine__")
 
-    risultati = ["EBITDA", "% EBITDA", "EBIT", "% EBIT", "EBT", "% EBT", "Risultato di Gruppo", "% Risultato di Gruppo"]
-    totali = ["Totale Ricavi", "Totale Costi", "Costi senza Personale"]
+    # Reordenar columnas para poner Voce justo después de Tipo
+    cols = df_resultado.columns.tolist()
+    if "Voce" in cols and "Tipo" in cols:
+        cols.remove("Voce")
+        cols.insert(cols.index("Tipo") + 1, "Voce")
+        df_resultado = df_resultado[cols]
 
-    def style_row(row):
-        base = "font-size: 14px;"
-        if row["Voce"] in risultati:
-            return f"font-weight: bold; background-color: #DAE9F8; {base}"
-        elif row["Tipo"] in totali:
-            return f"font-weight: bold; {base}"
-        else:
-            return base
-
+    # Formato miles
     for col in [periodo_1, periodo_2, "Δ"]:
         df_resultado[col] = df_resultado[col].apply(format_miles)
+
     df_resultado["Δ %"] = df_resultado["Δ %"].apply(format_percent)
 
-    df_resultado = df_resultado[["Tipo", "Voce", periodo_1, periodo_2, "Δ", "Δ %"]]
-
-    st.dataframe(df_resultado.style.applymap(style_row, subset=pd.IndexSlice[:, ["Voce"]]), use_container_width=True, height=1400)
+    st.dataframe(df_resultado, use_container_width=True, height=1400)
 
 # === STATO PATRIMONIALE ===
 elif pagina == "Stato Patrimoniale + Indicatori":
@@ -128,9 +121,9 @@ elif pagina == "Stato Patrimoniale + Indicatori":
             header_row = row_idx[0]
             df_sp = pd.read_excel(uploaded_ce, sheet_name="Stato Patrimoniale", header=header_row)
             df_sp = df_sp.fillna(0)
+
             col_anno_1 = df_sp.columns[1]
             col_anno_2 = df_sp.columns[2]
-
             df_sp["Δ"] = df_sp[col_anno_2] - df_sp[col_anno_1]
             df_sp["Δ %"] = np.where(
                 df_sp[col_anno_1] != 0,
@@ -159,9 +152,7 @@ elif pagina == "Rendiconto Finanziario":
     df = df.fillna(0)
 
     if df.shape[1] >= 2:
-        prima_colonna = df.columns[0]
         seconda_colonna = df.columns[1]
-
         try:
             df[seconda_colonna] = pd.to_numeric(df[seconda_colonna], errors="coerce")
             df[seconda_colonna] = df[seconda_colonna].apply(format_miles)
@@ -171,5 +162,3 @@ elif pagina == "Rendiconto Finanziario":
         st.warning("⚠️ Il foglio 'Rendiconto Finanziario' non ha abbastanza colonne.")
 
     st.dataframe(df, use_container_width=True, height=1200)
-
-
