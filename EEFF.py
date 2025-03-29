@@ -71,6 +71,7 @@ if pagina == "Conto Economico":
         delta_pct = (total["Δ"] / abs(total[periodo_2])) if total[periodo_2] != 0 else np.nan
         riga_totale = {
             "Tipo": tipo,
+            "Voce": "",
             periodo_1: total[periodo_1],
             periodo_2: total[periodo_2],
             "Δ": total["Δ"],
@@ -98,47 +99,18 @@ if pagina == "Conto Economico":
         df_resultado["__ordine__"] = df_resultado["Voce"].map(orden_dict)
         df_resultado = df_resultado.sort_values(by="__ordine__", na_position="last").drop(columns="__ordine__")
 
-    def format_miles(x):
-        try:
-            return f"{x:,.0f}".replace(",", ".")
-        except:
-            return x
-
-    def format_percent(x):
-        try:
-            return f"{x:.1%}"
-        except:
-            return x
-
-    def colorear(val, tipo, es_porcentaje=False):
-        try:
-            numero = float(str(val).replace(".", "").replace(",", ".").replace("%", ""))
-            if es_porcentaje:
-                numero = numero / 100
-            if tipo:
-                return f"🔴 {val}" if numero > 0 else f"🟢 {val}"
-            else:
-                return f"🟢 {val}" if numero > 0 else f"🔴 {val}"
-        except:
-            return val
-
-    df_resultado["is_cost"] = df_resultado["Tipo"].str.lower().str.contains("costo|costi|spesa|opex", na=False)
     for col in [periodo_1, periodo_2, "Δ"]:
         df_resultado[col] = df_resultado[col].apply(format_miles)
     df_resultado["Δ %"] = df_resultado["Δ %"].apply(format_percent)
 
-    df_resultado["Δ"] = [
-        colorear(v, t) for v, t in zip(df_resultado["Δ"], df_resultado["is_cost"])
-    ]
-    df_resultado["Δ %"] = [
-        colorear(v, t, es_porcentaje=True) for v, t in zip(df_resultado["Δ %"], df_resultado["is_cost"])
-    ]
-    df_resultado = df_resultado.drop(columns=["is_cost"])
-
-    if not mostrar_detalles:
-        df_resultado = df_resultado.drop(columns=["Voce"], errors="ignore")
+    # Reordenar columnas: Tipo, Voce, valores
+    cols = df_resultado.columns.tolist()
+    if "Voce" in cols and "Tipo" in cols:
+        reordered = ["Tipo", "Voce"] + [c for c in cols if c not in ["Tipo", "Voce"]]
+        df_resultado = df_resultado[reordered]
 
     st.dataframe(df_resultado, use_container_width=True, height=1400)
+
 elif pagina == "Stato Patrimoniale + Indicatori":
     st.title("🏦 Stato Patrimoniale")
 
@@ -186,3 +158,4 @@ elif pagina == "Rendiconto Finanziario":
         st.warning("⚠️ Il foglio 'Rendiconto Finanziario' non ha abbastanza colonne.")
 
     st.dataframe(df, use_container_width=True, height=1200)
+
