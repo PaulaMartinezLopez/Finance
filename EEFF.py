@@ -78,7 +78,7 @@ if pagina == "Conto Economico":
         }
         output.append(riga_totale)
 
-        if mostrar_detalles and tipo in ["Vendite", "Peresonal", "Altri Opex", "Oneri Finanziari"]:
+        if mostrar_detalles and tipo in ["Vendite", "Personal", "Altri Opex", "Oneri Finanziari"]:
             for _, row in subset.iterrows():
                 r = {
                     "Tipo": row["Tipo"],
