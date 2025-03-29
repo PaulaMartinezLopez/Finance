@@ -179,3 +179,4 @@ elif pagina == "Rendiconto Finanziario":
     st.dataframe(df, use_container_width=True, height=1200)
 
 
+
