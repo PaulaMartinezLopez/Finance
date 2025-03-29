@@ -88,7 +88,62 @@ if uploaded_file:
 
         valori = estrai_valori(df_sp, df)
 
-        ratios = [...]
+        ratios = [
+    {
+        "Nome": "Current Ratio",
+        "Formula": "Attività Correnti / Passività Correnti",
+        "Valori": lambda d: (
+            d['Attività Correnti']['2023'] / d['Passività Correnti']['2023'],
+            d['Attività Correnti']['2024'] / d['Passività Correnti']['2024']
+        ),
+        "Range": "> 1.2"
+    },
+    {
+        "Nome": "Debt to Equity",
+        "Formula": "Debiti Finanziari / Patrimonio Netto",
+        "Valori": lambda d: (
+            d['Debiti Finanziari']['2023'] / d['Patrimonio Netto']['2023'],
+            d['Debiti Finanziari']['2024'] / d['Patrimonio Netto']['2024']
+        ),
+        "Range": "< 1.5"
+    },
+    {
+        "Nome": "Leverage",
+        "Formula": "Totale Attivo / Patrimonio Netto",
+        "Valori": lambda d: (
+            d['Totale Attivo']['2023'] / d['Patrimonio Netto']['2023'],
+            d['Totale Attivo']['2024'] / d['Patrimonio Netto']['2024']
+        ),
+        "Range": "< 2.0"
+    },
+    {
+        "Nome": "ROA",
+        "Formula": "Utile Netto / Totale Attivo",
+        "Valori": lambda d: (
+            d['Utile Netto']['2023'] / d['Totale Attivo']['2023'],
+            d['Utile Netto']['2024'] / d['Totale Attivo']['2024']
+        ),
+        "Range": "> 5%"
+    },
+    {
+        "Nome": "ROE",
+        "Formula": "Utile Netto / Patrimonio Netto",
+        "Valori": lambda d: (
+            d['Utile Netto']['2023'] / d['Patrimonio Netto']['2023'],
+            d['Utile Netto']['2024'] / d['Patrimonio Netto']['2024']
+        ),
+        "Range": "> 10%"
+    },
+    {
+        "Nome": "Copertura Debito",
+        "Formula": "EBITDA / Debiti Finanziari",
+        "Valori": lambda d: (
+            d['EBITDA']['2023'] / d['Debiti Finanziari']['2023'],
+            d['EBITDA']['2024'] / d['Debiti Finanziari']['2024']
+        ),
+        "Range": "> 2"
+    },
+]
 
         # (Sin cambios en la definición de ratios y cálculo)
 
@@ -155,3 +210,4 @@ Indicatori Finanziari (JSON):
 
     except Exception as e:
         st.error(f"Error al procesar el archivo: {e}")
+
