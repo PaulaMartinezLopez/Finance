@@ -126,39 +126,13 @@ if pagina == "Conto Economico":
     if not mostrar_detalles:
         df_resultado = df_resultado.drop(columns=["Voce"], errors="ignore")
 
-    # Marcar filas KPI para aplicar estilo
-    kpi_negrita_azul = [
-        "Totale Ricavi", "Marginalità Vendite lorda", "% Marginalità Vendite lorda",
-        "EBITDA", "% EBITDA", "EBIT", "% EBIT", "EBT", "% EBT",
-        "Risultato di Gruppo", "% Risultato di Gruppo"
-    ]
-    df_resultado["row_style"] = df_resultado["Voce"].apply(lambda x: "kpi" if x in kpi_negrita_azul else "")
-
-    gb = GridOptionsBuilder.from_dataframe(df_resultado.drop(columns=["row_style"]))
+    # Mostrar con AgGrid con estilos
+    gb = GridOptionsBuilder.from_dataframe(df_resultado)
     gb.configure_default_column(resizable=True, wrapText=True, autoHeight=True)
-
-    cell_style_jscode = JsCode("""
-    function(params) {
-        if (params.data.row_style === 'kpi') {
-            return {
-                'font-weight': 'bold',
-                'background-color': '#DAE9F8',
-                'font-size': '15px'
-            }
-        }
-        return {};
-    }
-    """)
-
-    gb.configure_grid_options(getRowStyle=cell_style_jscode)
+    gb.configure_grid_options(domLayout='normal')
     gridOptions = gb.build()
 
-    AgGrid(
-        df_resultado.drop(columns=["row_style"]),
-        gridOptions=gridOptions,
-        height=1000,
-        fit_columns_on_grid_load=True
-    )
+    AgGrid(df_resultado, gridOptions=gridOptions, height=1000, fit_columns_on_grid_load=True)
 
 elif pagina == "Stato Patrimoniale + Indicatori":
     st.title("🏦 Stato Patrimoniale")
@@ -205,4 +179,5 @@ elif pagina == "Rendiconto Finanziario":
         st.warning("⚠️ Il foglio 'Rendiconto Finanziario' non ha abbastanza colonne.")
 
     st.dataframe(df, use_container_width=True, height=1200)
+
 
