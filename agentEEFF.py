@@ -92,7 +92,27 @@ if uploaded_file:
 
         # (Sin cambios en la definición de ratios y cálculo)
 
-        df_ratios = pd.DataFrame(tabella_ratios)
+        tabella_ratios = []
+
+for r in ratios:
+    try:
+        val_2023, val_2024 = r["Valori"](valori)
+        valut_2023 = valuta(val_2023*100 if "%" in r["Range"] else val_2023, r["Range"])
+        valut_2024 = valuta(val_2024*100 if "%" in r["Range"] else val_2024, r["Range"])
+
+        tabella_ratios.append({
+            "Indicatore": r["Nome"],
+            "Formula": r["Formula"],
+            "2023": round(val_2023*100, 1) if "%" in r["Range"] else round(val_2023, 2),
+            "2024": round(val_2024*100, 1) if "%" in r["Range"] else round(val_2024, 2),
+            "Range": r["Range"],
+            "Valutazione 2023": valut_2023,
+            "Valutazione 2024": valut_2024,
+        })
+    except Exception:
+        continue
+
+df_ratios = pd.DataFrame(tabella_ratios)
         st.dataframe(df_ratios.style.format({
             "2023": "{:,.2f}",
             "2024": "{:,.2f}"
