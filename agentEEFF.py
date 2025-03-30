@@ -18,7 +18,7 @@ if not GROQ_API_KEY:
     st.stop()
 
 # 📂 Subida de archivo
-uploaded_file = st.file_uploader("📁 Sube el archivo Conto_Economico_Budget.xlsx", type=["xlsx"])
+uploaded_file = st.file_uploader("📁 Sube el archivo Conto_Economico_Analisis.xlsx", type=["xlsx"])
 if uploaded_file:
     try:
         df = pd.read_excel(uploaded_file, sheet_name="Conto Economico")
