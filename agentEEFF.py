@@ -51,25 +51,13 @@ if uploaded_file:
         st.subheader("📊 Indicatori Finanziari Chiave (2023 e 2024)")
 
         def estrai_valori(df_sp, df_ce):
-            def get_val_by_tipo(df, tipo, col):
-                match = df[df['Tipo'].str.lower().str.strip() == tipo.lower()]
-                if match.empty:
-                    st.warning(f"⚠️ Tipo '{tipo}' no encontrado en Stato Patrimoniale.")
-                    return np.nan
-                val = match[col].sum()
-                if pd.isna(val):
-                    st.warning(f"⚠️ Valor nulo para '{tipo}' en columna {col}.")
-                return float(val)
+            def get_val_by_voce(df, voce, col):
+                match = df[df['Voce'].str.strip().str.lower() == voce.lower()]
+                return match[col].values[0] if not match.empty else np.nan
 
-            def get_val_exact_voce(df, voce_exact, col):
-                match = df[df['Voce'].str.strip().str.lower() == voce_exact.lower()]
-                if match.empty:
-                    st.warning(f"⚠️ Línea exacta '{voce_exact}' no encontrada en Conto Economico.")
-                    return np.nan
-                val = match[col].values[0]
-                if pd.isna(val):
-                    st.warning(f"⚠️ Valor nulo en '{voce_exact}' ({col})")
-                return float(val)
+            def get_val_by_tipo(df, tipo, col):
+                match = df[df['Tipo'].str.strip().str.lower() == tipo.lower()]
+                return match[col].sum() if not match.empty else np.nan
 
             dati = {
                 'Totale Attivo': {
@@ -85,109 +73,67 @@ if uploaded_file:
                     '2024': get_val_by_tipo(df_sp, 'Debiti Finanziari', '2024'),
                 },
                 'Attività Correnti': {
-                    '2023': df_sp[df_sp['Tipo'] == 'Attività Correnti']['2023'].sum(),
-                    '2024': df_sp[df_sp['Tipo'] == 'Attività Correnti']['2024'].sum(),
+                    '2023': get_val_by_tipo(df_sp, 'Attività Correnti', '2023'),
+                    '2024': get_val_by_tipo(df_sp, 'Attività Correnti', '2024'),
                 },
                 'Passività Correnti': {
-                    '2023': df_sp[df_sp['Tipo'] == 'Passività Correnti']['2023'].sum(),
-                    '2024': df_sp[df_sp['Tipo'] == 'Passività Correnti']['2024'].sum(),
+                    '2023': get_val_by_tipo(df_sp, 'Passività Correnti', '2023'),
+                    '2024': get_val_by_tipo(df_sp, 'Passività Correnti', '2024'),
+                },
+                'Magazzino': {
+                    '2023': get_val_by_voce(df_sp, 'Magazzino', '2023'),
+                    '2024': get_val_by_voce(df_sp, 'Magazzino', '2024'),
+                },
+                'Crediti Clienti': {
+                    '2023': get_val_by_voce(df_sp, 'Crediti v Clienti', '2023'),
+                    '2024': get_val_by_voce(df_sp, 'Crediti v Clienti', '2024'),
+                },
+                'Debiti Fornitori': {
+                    '2023': get_val_by_voce(df_sp, 'Debiti v Fornitori', '2023'),
+                    '2024': get_val_by_voce(df_sp, 'Debiti v Fornitori', '2024'),
                 },
                 'Utile Netto': {
                     '2023': get_val_by_tipo(df_sp, 'Utile Netto', '2023'),
                     '2024': get_val_by_tipo(df_sp, 'Utile Netto', '2024'),
                 },
                 'Ricavi': {
-                    '2023': get_val_exact_voce(df_ce, 'Totale Ricavi', 'Accum. 2023'),
-                    '2024': get_val_exact_voce(df_ce, 'Totale Ricavi', 'Accum. 2024'),
+                    '2023': get_val_by_voce(df_ce, 'Totale Ricavi', 'Accum. 2023'),
+                    '2024': get_val_by_voce(df_ce, 'Totale Ricavi', 'Accum. 2024'),
                 },
                 'EBITDA': {
-                    '2023': get_val_exact_voce(df_ce, 'ebitda', 'Accum. 2023'),
-                    '2024': get_val_exact_voce(df_ce, 'ebitda', 'Accum. 2024'),
+                    '2023': get_val_by_voce(df_ce, 'ebitda', 'Accum. 2023'),
+                    '2024': get_val_by_voce(df_ce, 'ebitda', 'Accum. 2024'),
+                },
+                'Costo del Venduto': {
+                    '2023': get_val_by_voce(df_ce, 'Costo Merce', 'Accum. 2023') + get_val_by_voce(df_ce, 'Trasporto per Vendite', 'Accum. 2023'),
+                    '2024': get_val_by_voce(df_ce, 'Costo Merce', 'Accum. 2024') + get_val_by_voce(df_ce, 'Trasporto per Vendite', 'Accum. 2024'),
                 },
             }
-
             return dati
 
         valori = estrai_valori(df_sp, df)
 
-        ratios = [
-            {"Nome": "Current Ratio", "Formula": "Attività Correnti / Passività Correnti", "Valori": lambda d: (d['Attività Correnti']['2023'] / d['Passività Correnti']['2023'], d['Attività Correnti']['2024'] / d['Passività Correnti']['2024']), "Range": "> 1.2"},
-            {"Nome": "Debt to Equity", "Formula": "Debiti Finanziari / Patrimonio Netto", "Valori": lambda d: (d['Debiti Finanziari']['2023'] / d['Patrimonio Netto']['2023'], d['Debiti Finanziari']['2024'] / d['Patrimonio Netto']['2024']), "Range": "< 1.5"},
-            {"Nome": "Leverage", "Formula": "Totale Attivo / Patrimonio Netto", "Valori": lambda d: (d['Totale Attivo']['2023'] / d['Patrimonio Netto']['2023'], d['Totale Attivo']['2024'] / d['Patrimonio Netto']['2024']), "Range": "< 2.0"},
-            {"Nome": "ROA", "Formula": "Utile Netto / Totale Attivo", "Valori": lambda d: (d['Utile Netto']['2023'] / d['Totale Attivo']['2023'], d['Utile Netto']['2024'] / d['Totale Attivo']['2024']), "Range": "> 5%"},
-            {"Nome": "ROE", "Formula": "Utile Netto / Patrimonio Netto", "Valori": lambda d: (d['Utile Netto']['2023'] / d['Patrimonio Netto']['2023'], d['Utile Netto']['2024'] / d['Patrimonio Netto']['2024']), "Range": "> 10%"},
-            {"Nome": "Copertura Debito", "Formula": "EBITDA / Debiti Finanziari", "Valori": lambda d: (d['EBITDA']['2023'] / d['Debiti Finanziari']['2023'], d['EBITDA']['2024'] / d['Debiti Finanziari']['2024']), "Range": "> 2"},
-        ]
+        # 📒 Calcular ciclo de conversión de efectivo
+        def safe_ratio(numer, denom):
+            return numer / denom if denom != 0 else np.nan
 
-        def valuta(val, criterio):
-            if ">" in criterio:
-                soglia = float(criterio.split(">")[1].strip().replace("%", ""))
-                return "Buono" if val > soglia else "Critico"
-            elif "<" in criterio:
-                soglia = float(criterio.split("<")[1].strip().replace("%", ""))
-                return "Buono" if val < soglia else "Critico"
-            else:
-                return "N/A"
+        ciclo = []
+        for year in ['2023', '2024']:
+            DIO = safe_ratio(valori['Magazzino'][year], valori['Costo del Venduto'][year]) * 365
+            DSO = safe_ratio(valori['Crediti Clienti'][year], valori['Ricavi'][year]) * 365
+            DPO = safe_ratio(valori['Debiti Fornitori'][year], valori['Costo del Venduto'][year]) * 365
+            ciclo.append({
+                "Anno": year,
+                "DIO (Giorni Magazzino)": round(DIO, 1),
+                "DSO (Giorni Incasso Clienti)": round(DSO, 1),
+                "DPO (Giorni Pagamento Fornitori)": round(DPO, 1),
+                "Periodo Medio di Maturazione": round(DIO + DSO - DPO, 1)
+            })
 
-        tabella_ratios = []
-
-        for r in ratios:
-            try:
-                val_2023, val_2024 = r["Valori"](valori)
-                valut_2023 = valuta(val_2023*100 if "%" in r["Range"] else val_2023, r["Range"])
-                valut_2024 = valuta(val_2024*100 if "%" in r["Range"] else val_2024, r["Range"])
-
-                tabella_ratios.append({
-                    "Indicatore": r["Nome"],
-                    "Formula": r["Formula"],
-                    "2023": round(val_2023*100, 1) if "%" in r["Range"] else round(val_2023, 2),
-                    "2024": round(val_2024*100, 1) if "%" in r["Range"] else round(val_2024, 2),
-                    "Range": r["Range"],
-                    "Valutazione 2023": valut_2023,
-                    "Valutazione 2024": valut_2024,
-                })
-            except Exception:
-                continue
-
-        df_ratios = pd.DataFrame(tabella_ratios)
-        st.dataframe(df_ratios.style.format({"2023": "{:,.2f}", "2024": "{:,.2f}"}), use_container_width=True)
-
-        ratios_json = df_ratios.to_json(orient="records")
-
-        # 🧠 Comentario FP&A con IA
-        st.subheader("🧠 Comentario automático di analisi FP&A")
-
-        df_prompt = df[['Voce', 'Accum. 2023', 'Accum. 2024', 'Budget 2024', 'Δ vs 2023', 'Δ vs Budget']].copy()
-        data_json = df_prompt.to_json(orient="records")
-
-        prompt = f"""
-Sei un analista finanziario senior. Analizza il seguente conto economico che confronta i risultati del 2024 con quelli del 2023 e con il budget.
-Compiti:
-- Identifica le variazioni più rilevanti.
-- Commenta i trend positivi o negativi.
-- Rileva eventuali superamenti del budget o sottoperformance.
-- Analizza i principali indicatori finanziari calcolati.
-- Suggerisci azioni correttive o interpretazioni strategiche.
-
-Conto Economico (JSON):
-{data_json}
-
-Indicatori Finanziari (JSON):
-{ratios_json}
-"""
-
-        client = Groq(api_key=GROQ_API_KEY)
-        response = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": "Sei un esperto in controllo di gestione e FP&A."},
-                {"role": "user", "content": prompt}
-            ],
-            model="llama3-8b-8192",
-        )
-
-        st.markdown(response.choices[0].message.content)
+        df_ciclo = pd.DataFrame(ciclo)
+        st.subheader("📊 Ciclo di Conversione di Cassa (DIO + DSO - DPO)")
+        st.dataframe(df_ciclo.set_index("Anno"), use_container_width=True)
 
     except Exception as e:
         st.error(f"Error al procesar el archivo: {e}")
-
 
