@@ -130,6 +130,45 @@ if uploaded_file:
 
         st.dataframe(df_ratios.style.format({"2023": "{:,.2f}", "2024": "{:,.2f}"}), use_container_width=True)
 
+
+        df_ratios = pd.DataFrame(tabella_ratios)
+        st.dataframe(df_ratios.style.format({"2023": "{:,.2f}", "2024": "{:,.2f}"}), use_container_width=True)
+
+        ratios_json = df_ratios.to_json(orient="records")
+
+        # 🧠 Comentario FP&A con IA
+        st.subheader("🧠 Comentario automático di analisi FP&A")
+
+        df_prompt = df[['Voce', 'Accum. 2023', 'Accum. 2024', 'Budget 2024', 'Δ vs 2023', 'Δ vs Budget']].copy()
+        data_json = df_prompt.to_json(orient="records")
+
+        prompt = f"""
+Sei un analista finanziario senior. Analizza il seguente conto economico che confronta i risultati del 2024 con quelli del 2023 e con il budget.
+Compiti:
+- Identifica le variazioni più rilevanti.
+- Commenta i trend positivi o negativi.
+- Rileva eventuali superamenti del budget o sottoperformance.
+- Analizza i principali indicatori finanziari calcolati.
+- Suggerisci azioni correttive o interpretazioni strategiche.
+
+Conto Economico (JSON):
+{data_json}
+
+Indicatori Finanziari (JSON):
+{ratios_json}
+"""
+
+        client = Groq(api_key=GROQ_API_KEY)
+        response = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": "Sei un esperto in controllo di gestione e FP&A."},
+                {"role": "user", "content": prompt}
+            ],
+            model="llama3-8b-8192",
+        )
+
+        st.markdown(response.choices[0].message.content)
+
     except Exception as e:
         st.error(f"Error al procesar el archivo: {e}")
 
