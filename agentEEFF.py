@@ -54,25 +54,13 @@ if uploaded_file:
         def estrai_valori(df_sp, df_ce):
             def get_val_by_tipo(df, tipo, col):
                 match = df[df['Tipo'].str.lower().str.strip() == tipo.lower()]
-                if match.empty:
-                    st.warning(f"⚠️ Tipo '{tipo}' no encontrado en Stato Patrimoniale.")
-                    return np.nan
-                val = match[col].sum()
-                if pd.isna(val):
-                    st.warning(f"⚠️ Valor nulo para '{tipo}' en columna {col}.")
-                return float(val)
+                return match[col].sum() if not match.empty else np.nan
 
             def get_val_exact_voce(df, voce_exact, col):
                 match = df[df['Voce'].str.strip().str.lower() == voce_exact.lower()]
-                if match.empty:
-                    st.warning(f"⚠️ Línea exacta '{voce_exact}' no encontrada en Conto Economico.")
-                    return np.nan
-                val = match[col].values[0]
-                if pd.isna(val):
-                    st.warning(f"⚠️ Valor nulo en '{voce_exact}' ({col})")
-                return float(val)
+                return match[col].values[0] if not match.empty else np.nan
 
-            dati = {
+            return {
                 'Totale Attivo': {
                     '2023': get_val_by_tipo(df_sp, 'Totale Attivo', '2023'),
                     '2024': get_val_by_tipo(df_sp, 'Totale Attivo', '2024'),
@@ -86,12 +74,12 @@ if uploaded_file:
                     '2024': get_val_by_tipo(df_sp, 'Debiti Finanziari', '2024'),
                 },
                 'Attività Correnti': {
-                    '2023': df_sp[df_sp['Tipo'] == 'Attività Correnti']['2023'].sum(),
-                    '2024': df_sp[df_sp['Tipo'] == 'Attività Correnti']['2024'].sum(),
+                    '2023': get_val_by_tipo(df_sp, 'Attività Correnti', '2023'),
+                    '2024': get_val_by_tipo(df_sp, 'Attività Correnti', '2024'),
                 },
                 'Passività Correnti': {
-                    '2023': df_sp[df_sp['Tipo'] == 'Passività Correnti']['2023'].sum(),
-                    '2024': df_sp[df_sp['Tipo'] == 'Passività Correnti']['2024'].sum(),
+                    '2023': get_val_by_tipo(df_sp, 'Passività Correnti', '2023'),
+                    '2024': get_val_by_tipo(df_sp, 'Passività Correnti', '2024'),
                 },
                 'Utile Netto': {
                     '2023': get_val_by_tipo(df_sp, 'Utile Netto', '2023'),
@@ -122,11 +110,51 @@ if uploaded_file:
                     '2024': abs(get_val_exact_voce(df_ce, 'Costo Merce', 'Accum. 2024') + get_val_exact_voce(df_ce, 'Trasporto per Vendite', 'Accum. 2024')),
                 },
             }
-            return dati
 
         valori = estrai_valori(df_sp, df)
 
-        # Aquí seguiría el bloque de ratios y análisis como ya lo tenías definido...
+        ratios = [
+            {"Nome": "Current Ratio", "Formula": "Attività Correnti / Passività Correnti", "Valori": lambda d: (d['Attività Correnti']['2023'] / d['Passività Correnti']['2023'], d['Attività Correnti']['2024'] / d['Passività Correnti']['2024']), "Range": "> 1.2"},
+            {"Nome": "Debt to Equity", "Formula": "Debiti Finanziari / Patrimonio Netto", "Valori": lambda d: (d['Debiti Finanziari']['2023'] / d['Patrimonio Netto']['2023'], d['Debiti Finanziari']['2024'] / d['Patrimonio Netto']['2024']), "Range": "< 1.5"},
+            {"Nome": "Leverage", "Formula": "Totale Attivo / Patrimonio Netto", "Valori": lambda d: (d['Totale Attivo']['2023'] / d['Patrimonio Netto']['2023'], d['Totale Attivo']['2024'] / d['Patrimonio Netto']['2024']), "Range": "< 2.0"},
+            {"Nome": "ROA", "Formula": "Utile Netto / Totale Attivo", "Valori": lambda d: (d['Utile Netto']['2023'] / d['Totale Attivo']['2023'], d['Utile Netto']['2024'] / d['Totale Attivo']['2024']), "Range": "> 5%"},
+            {"Nome": "ROE", "Formula": "Utile Netto / Patrimonio Netto", "Valori": lambda d: (d['Utile Netto']['2023'] / d['Patrimonio Netto']['2023'], d['Utile Netto']['2024'] / d['Patrimonio Netto']['2024']), "Range": "> 10%"},
+            {"Nome": "Copertura Debito", "Formula": "EBITDA / Debiti Finanziari", "Valori": lambda d: (d['EBITDA']['2023'] / d['Debiti Finanziari']['2023'], d['EBITDA']['2024'] / d['Debiti Finanziari']['2024']), "Range": "> 2"},
+        ]
+
+        def valuta(val, criterio):
+            if ">" in criterio:
+                soglia = float(criterio.split(">")[1].strip().replace("%", ""))
+                return "Buono" if val > soglia else "Critico"
+            elif "<" in criterio:
+                soglia = float(criterio.split("<")[1].strip().replace("%", ""))
+                return "Buono" if val < soglia else "Critico"
+            return "N/A"
+
+        tabella_ratios = []
+        for r in ratios:
+            try:
+                val_2023, val_2024 = r["Valori"](valori)
+                valut_2023 = valuta(val_2023 * 100 if "%" in r["Range"] else val_2023, r["Range"])
+                valut_2024 = valuta(val_2024 * 100 if "%" in r["Range"] else val_2024, r["Range"])
+                tabella_ratios.append({
+                    "Indicatore": r["Nome"],
+                    "Formula": r["Formula"],
+                    "2023": round(val_2023 * 100, 1) if "%" in r["Range"] else round(val_2023, 2),
+                    "2024": round(val_2024 * 100, 1) if "%" in r["Range"] else round(val_2024, 2),
+                    "Range": r["Range"],
+                    "Valutazione 2023": valut_2023,
+                    "Valutazione 2024": valut_2024,
+                })
+            except Exception:
+                continue
+
+        df_ratios = pd.DataFrame(tabella_ratios)
+
+        st.dataframe(df_ratios.style.format({
+            "2023": "{:,.2f}",
+            "2024": "{:,.2f}"
+        }), use_container_width=True)
 
     except Exception as e:
         st.error(f"Error al procesar el archivo: {e}")
