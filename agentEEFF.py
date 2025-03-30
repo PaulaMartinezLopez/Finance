@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -25,7 +26,6 @@ if uploaded_file:
         df = df[[col for col in columnas_necesarias if col in df.columns]].copy()
         df = df.dropna(subset=['Voce']).fillna(0)
 
-        # Cálculo de desviaciones
         df['Δ vs 2023'] = df['Accum. 2024'] - df['Accum. 2023']
         df['Δ vs Budget'] = df['Accum. 2024'] - df['Budget 2024']
         df['Δ% vs 2023'] = np.where(df['Accum. 2023'] != 0, df['Δ vs 2023'] / df['Accum. 2023'] * 100, np.nan)
@@ -41,12 +41,10 @@ if uploaded_file:
             'Δ% vs Budget': '{:.1f}%'
         }), use_container_width=True)
 
-        # Cargar y preparar Stato Patrimoniale
         df_sp = pd.read_excel(uploaded_file, sheet_name="Stato Patrimoniale")
         df_sp.columns = [str(c).strip().replace("Accum. ", "") for c in df_sp.columns]
         df_sp = df_sp.dropna(subset=['Voce']).fillna(0)
 
-        # Funciones de extracción
         def get_val(df, voce, col):
             match = df[df['Voce'].str.contains(voce, case=False, na=False)]
             return float(match[col].values[0]) if not match.empty else np.nan
@@ -59,16 +57,15 @@ if uploaded_file:
             match = df[df['Voce'].str.lower().str.strip() == voce.lower()]
             return match[col].values[0] if not match.empty else np.nan
 
-        # Datos para KPIs operativos
         ricavi_2023 = get_val(df, "Totale Ricavi", "Accum. 2023")
         ricavi_2024 = get_val(df, "Totale Ricavi", "Accum. 2024")
         cogs_2023 = abs(get_val(df, "Costo Merce", "Accum. 2023") + get_val(df, "Trasporto per Vendite", "Accum. 2023"))
         cogs_2024 = abs(get_val(df, "Costo Merce", "Accum. 2024") + get_val(df, "Trasporto per Vendite", "Accum. 2024"))
 
-        dso_2023 = get_val(df_sp, "Crediti v Clienti", "2023") / ricavi_2023 * 365
-        dso_2024 = get_val(df_sp, "Crediti v Clienti", "2024") / ricavi_2024 * 365
-        dpo_2023 = get_val(df_sp, "Debiti v Fornitori", "2023") / cogs_2023 * 365
-        dpo_2024 = get_val(df_sp, "Debiti v Fornitori", "2024") / cogs_2024 * 365
+        dso_2023 = get_val(df_sp, "Crediti vs Clienti", "2023") / ricavi_2023 * 365
+        dso_2024 = get_val(df_sp, "Crediti vs Clienti", "2024") / ricavi_2024 * 365
+        dpo_2023 = get_val(df_sp, "Debiti vs Fornitori", "2023") / cogs_2023 * 365
+        dpo_2024 = get_val(df_sp, "Debiti vs Fornitori", "2024") / cogs_2024 * 365
         dio_2023 = abs(get_val(df_sp, "Magazzino", "2023") / cogs_2023 * 365)
         dio_2024 = abs(get_val(df_sp, "Magazzino", "2024") / cogs_2024 * 365)
 
@@ -85,8 +82,7 @@ if uploaded_file:
         })
         st.dataframe(df_ciclo, use_container_width=True)
 
-        # Ratios financieros con columna 'Tipo'
-        st.subheader("📈 Altri Indicatori Finanziari")
+        st.subheader("📈 Indicatori Finanziari")
 
         valori = {
             'Totale Attivo': {'2023': get_val_tipo(df_sp, 'Totale Attivo', '2023'), '2024': get_val_tipo(df_sp, 'Totale Attivo', '2024')},
@@ -112,11 +108,11 @@ if uploaded_file:
         def valuta(val, criterio):
             if ">" in criterio:
                 soglia = float(criterio.split(">")[1].strip().replace("%", ""))
-                return "Buono" if val > soglia else "Critico"
+                return "🟢" if val > soglia else "🔴"
             elif "<" in criterio:
                 soglia = float(criterio.split("<")[1].strip().replace("%", ""))
-                return "Buono" if val < soglia else "Critico"
-            return "N/A"
+                return "🟢" if val < soglia else "🔴"
+            return "⚪️"
 
         df_ratios = pd.DataFrame([{
             "Indicatore": r["Nome"],
@@ -128,17 +124,9 @@ if uploaded_file:
             "Valutazione 2024": valuta(r["Valori"](valori)[1] * 100 if "%" in r["Range"] else r["Valori"](valori)[1], r["Range"])
         } for r in ratios])
 
-        st.dataframe(df_ratios.style.format({"2023": "{:,.2f}", "2024": "{:,.2f}"}), use_container_width=True)
-
-
-        df_ratios = pd.DataFrame(tabella_ratios)
-        st.dataframe(df_ratios.style.format({"2023": "{:,.2f}", "2024": "{:,.2f}"}), use_container_width=True)
+        st.dataframe(df_ratios, use_container_width=True)
 
         ratios_json = df_ratios.to_json(orient="records")
-
-        # 🧠 Comentario FP&A con IA
-        st.subheader("🧠 Comentario automático di analisi FP&A")
-
         df_prompt = df[['Voce', 'Accum. 2023', 'Accum. 2024', 'Budget 2024', 'Δ vs 2023', 'Δ vs Budget']].copy()
         data_json = df_prompt.to_json(orient="records")
 
@@ -158,6 +146,8 @@ Indicatori Finanziari (JSON):
 {ratios_json}
 """
 
+        st.subheader("🧠 Comentario automatico di analisi FP&A")
+
         client = Groq(api_key=GROQ_API_KEY)
         response = client.chat.completions.create(
             messages=[
@@ -171,5 +161,6 @@ Indicatori Finanziari (JSON):
 
     except Exception as e:
         st.error(f"Error al procesar el archivo: {e}")
+
 
 
