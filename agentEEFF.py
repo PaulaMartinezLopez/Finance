@@ -21,6 +21,7 @@ uploaded_file = st.file_uploader("📁 Sube el archivo Conto_Economico_Budget.xl
 if uploaded_file:
     try:
         df = pd.read_excel(uploaded_file, sheet_name="Conto Economico")
+
         columnas_necesarias = ['Voce', 'Accum. 2023', 'Accum. 2024', 'Budget 2024']
         df = df[[col for col in columnas_necesarias if col in df.columns]].copy()
         df = df.dropna(subset=['Voce']).fillna(0)
@@ -30,7 +31,7 @@ if uploaded_file:
         df['Δ% vs 2023'] = np.where(df['Accum. 2023'] != 0, df['Δ vs 2023'] / df['Accum. 2023'] * 100, np.nan)
         df['Δ% vs Budget'] = np.where(df['Budget 2024'] != 0, df['Δ vs Budget'] / df['Budget 2024'] * 100, np.nan)
 
-        st.dataframe(df.style.background_gradient(cmap="Blues").format({
+        st.dataframe(df.style.format({
             'Accum. 2023': '€{:,.0f}',
             'Accum. 2024': '€{:,.0f}',
             'Budget 2024': '€{:,.0f}',
@@ -40,79 +41,44 @@ if uploaded_file:
             'Δ% vs Budget': '{:.1f}%'
         }), use_container_width=True)
 
+        # Ratios financieros adicionales
         df_sp = pd.read_excel(uploaded_file, sheet_name="Stato Patrimoniale")
         df_sp.columns = [str(c).strip().replace("Accum. ", "") for c in df_sp.columns]
         df_sp = df_sp.dropna(subset=['Voce']).fillna(0)
 
-        st.subheader("📊 Indicatori Finanziari Chiave (2023 e 2024)")
+        st.subheader("📊 Ciclo di Conversione di Cassa (DIO + DSO - DPO)")
 
         def get_val(df, voce, col):
             match = df[df['Voce'].str.contains(voce, case=False, na=False)]
             return float(match[col].values[0]) if not match.empty else np.nan
 
-        valori = {
-            'Totale Attivo': {yr: get_val(df_sp, 'Totale Attivo', str(yr)) for yr in [2023, 2024]},
-            'Patrimonio Netto': {yr: get_val(df_sp, 'Patrimonio Netto', str(yr)) for yr in [2023, 2024]},
-            'Debiti Finanziari': {yr: get_val(df_sp, 'Debiti Fin. Import', str(yr)) for yr in [2023, 2024]},
-            'Attività Correnti': {yr: df_sp[df_sp['Tipo'] == 'Attività Correnti'][str(yr)].sum() for yr in [2023, 2024]},
-            'Passività Correnti': {yr: df_sp[df_sp['Tipo'] == 'Passività Correnti'][str(yr)].sum() for yr in [2023, 2024]},
-            'Utile Netto': {yr: get_val(df_sp, 'Utile Netto', str(yr)) for yr in [2023, 2024]},
-            'Ricavi': {
-                2023: get_val(df, 'Totale Ricavi', 'Accum. 2023'),
-                2024: get_val(df, 'Totale Ricavi', 'Accum. 2024'),
-            },
-            'EBITDA': {
-                2023: get_val(df, 'EBITDA', 'Accum. 2023'),
-                2024: get_val(df, 'EBITDA', 'Accum. 2024'),
-            },
-            'Rimanenze': {
-                2023: get_val(df_sp, 'Magazzino', '2023'),
-                2024: get_val(df_sp, 'Magazzino', '2024'),
-            },
-            'Crediti Clienti': {
-                2023: get_val(df_sp, 'Crediti vs Clienti', '2023'),
-                2024: get_val(df_sp, 'Crediti vs Clienti', '2024'),
-            },
-            'Debiti Fornitori': {
-                2023: get_val(df_sp, 'Debiti vs Fornitori', '2023'),
-                2024: get_val(df_sp, 'Debiti vs Fornitori', '2024'),
-            },
-            'COGS': {
-                2023: abs(get_val(df, 'Costo Merce', 'Accum. 2023') + get_val(df, 'Trasporto per Vendite', 'Accum. 2023')),
-                2024: abs(get_val(df, 'Costo Merce', 'Accum. 2024') + get_val(df, 'Trasporto per Vendite', 'Accum. 2024')),
-            }
-        }
+        ricavi_2023 = get_val(df, "Totale Ricavi", "Accum. 2023")
+        ricavi_2024 = get_val(df, "Totale Ricavi", "Accum. 2024")
 
-        ciclo_conversione = []
-        for anno in [2023, 2024]:
-            ricavi = valori['Ricavi'][anno]
-            cogs = valori['COGS'][anno]
-            ciclo_conversione.append({
-                "Anno": anno,
-                "DIO (Giorni Magazzino)": round(valori['Rimanenze'][anno] / (cogs / 365), 1) if cogs else np.nan,
-                "DSO (Giorni Incasso Clienti)": round(valori['Crediti Clienti'][anno] / (ricavi / 365), 1) if ricavi else np.nan,
-                "DPO (Giorni Pagamento Fornitori)": round(valori['Debiti Fornitori'][anno] / (cogs / 365), 1) if cogs else np.nan,
-            })
+        cogs_2023 = abs(get_val(df, "Costo Merce", "Accum. 2023") + get_val(df, "Trasporto per Vendite", "Accum. 2023"))
+        cogs_2024 = abs(get_val(df, "Costo Merce", "Accum. 2024") + get_val(df, "Trasporto per Vendite", "Accum. 2024"))
 
-        df_ciclo = pd.DataFrame(ciclo_conversione)
-        df_ciclo["Periodo Medio di Maturazione"] = df_ciclo["DIO (Giorni Magazzino)"] + df_ciclo["DSO (Giorni Incasso Clienti)"] - df_ciclo["DPO (Giorni Pagamento Fornitori)"]
+        dso_2023 = get_val(df_sp, "Crediti vs Clienti", "2023") / ricavi_2023 * 365
+        dso_2024 = get_val(df_sp, "Crediti vs Clienti", "2024") / ricavi_2024 * 365
 
-        st.subheader("🔄 Ciclo di Conversione di Cassa (DIO + DSO - DPO)")
-        st.dataframe(df_ciclo.set_index("Anno").style.format("{:.1f}"), use_container_width=True)
+        dpo_2023 = get_val(df_sp, "Debiti vs Fornitori", "2023") / cogs_2023 * 365
+        dpo_2024 = get_val(df_sp, "Debiti vs Fornitori", "2024") / cogs_2024 * 365
 
-        # Mostrar ratios nuevamente (por claridad)
-        st.subheader("📈 Indicatori Finanziari Chiave (2023 e 2024) - Dettaglio")
-        df_ratios = pd.DataFrame([{
-            "Indicatore": k["Nome"],
-            "Formula": k["Formula"],
-            "2023": round(k["Valori"](valori)[0]*100, 1) if "%" in k["Range"] else round(k["Valori"](valori)[0], 2),
-            "2024": round(k["Valori"](valori)[1]*100, 1) if "%" in k["Range"] else round(k["Valori"](valori)[1], 2),
-            "Range": k["Range"],
-            "Valutazione 2023": valuta(k["Valori"](valori)[0]*100 if "%" in k["Range"] else k["Valori"](valori)[0], k["Range"]),
-            "Valutazione 2024": valuta(k["Valori"](valori)[1]*100 if "%" in k["Range"] else k["Valori"](valori)[1], k["Range"])
-        } for k in ratios])
+        dio_2023 = abs(get_val(df_sp, "Magazzino", "2023") / cogs_2023 * 365)
+        dio_2024 = abs(get_val(df_sp, "Magazzino", "2024") / cogs_2024 * 365)
 
-        st.dataframe(df_ratios.style.format({"2023": "{:.2f}", "2024": "{:.2f}"}), use_container_width=True)
+        ciclo_2023 = dio_2023 + dso_2023 - dpo_2023
+        ciclo_2024 = dio_2024 + dso_2024 - dpo_2024
+
+        df_ciclo = pd.DataFrame({
+            "Anno": [2023, 2024],
+            "DIO (Giorni Magazzino)": [round(dio_2023, 1), round(dio_2024, 1)],
+            "DSO (Giorni Incasso Clienti)": [round(dso_2023, 1), round(dso_2024, 1)],
+            "DPO (Giorni Pagamento Fornitori)": [round(dpo_2023, 1), round(dpo_2024, 1)],
+            "Periodo Medio di Maturazione": [round(ciclo_2023, 1), round(ciclo_2024, 1)]
+        })
+
+        st.dataframe(df_ciclo, use_container_width=True)
 
     except Exception as e:
         st.error(f"Error al procesar el archivo: {e}")
