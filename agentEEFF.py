@@ -50,102 +50,62 @@ if uploaded_file:
 
         st.subheader("📊 Indicatori Finanziari Chiave (2023 e 2024)")
 
-        mapeo = {
-            "Totale Attivo": "Totale Attivo",
-            "Patrimonio Netto": "Patrimonio Netto",
-            "Debiti Finanziari": "Debiti Fin. Import",
-            "Attività Correnti": "Attività Correnti",
-            "Passività Correnti": "Passività Correnti",
-            "Crediti Clienti": "Crediti vs Clienti",
-            "Debiti Fornitori": "Debiti vs Fornitori",
-            "Rimanenze": "Magazzino",
-        }
+        def get_val_by_tipo(df, tipo, col):
+            match = df[df['Tipo'].str.lower().str.strip() == tipo.lower()]
+            return float(match[col].values[0]) if not match.empty else np.nan
 
         def get_val(df, voce, col):
             riga = df[df['Voce'].str.contains(voce, case=False, na=False)]
             return float(riga[col].values[0]) if not riga.empty else np.nan
 
         def estrai_valori(df_sp, df_ce):
-            dati = {}
-            for nome_logico, voce_excel in mapeo.items():
-                dati[nome_logico] = {
-                    '2023': get_val(df_sp, voce_excel, '2023'),
-                    '2024': get_val(df_sp, voce_excel, '2024'),
-                }
-            dati['EBITDA'] = {
-                '2023': get_val(df_ce, "EBITDA", 'Accum. 2023'),
-                '2024': get_val(df_ce, "EBITDA", 'Accum. 2024'),
-            }
-            dati['Utile Netto'] = {
-                '2023': get_val(df_ce, "Risultato di Gruppo", 'Accum. 2023'),
-                '2024': get_val(df_ce, "Risultato di Gruppo", 'Accum. 2024'),
-            }
-            dati['Ricavi'] = {
-                '2023': get_val(df_ce, "Totale Ricavi", 'Accum. 2023'),
-                '2024': get_val(df_ce, "Totale Ricavi", 'Accum. 2024'),
+            dati = {
+                'Totale Attivo': {
+                    '2023': get_val_by_tipo(df_sp, 'Totale Attivo', '2023'),
+                    '2024': get_val_by_tipo(df_sp, 'Totale Attivo', '2024'),
+                },
+                'Patrimonio Netto': {
+                    '2023': get_val_by_tipo(df_sp, 'Patrimonio Netto', '2023'),
+                    '2024': get_val_by_tipo(df_sp, 'Patrimonio Netto', '2024'),
+                },
+                'Debiti Finanziari': {
+                    '2023': get_val_by_tipo(df_sp, 'Debiti Finanziari', '2023'),
+                    '2024': get_val_by_tipo(df_sp, 'Debiti Finanziari', '2024'),
+                },
+                'Attività Correnti': {
+                    '2023': df_sp[df_sp['Tipo'] == 'Attività Correnti']['2023'].sum(),
+                    '2024': df_sp[df_sp['Tipo'] == 'Attività Correnti']['2024'].sum(),
+                },
+                'Passività Correnti': {
+                    '2023': df_sp[df_sp['Tipo'] == 'Passività Correnti']['2023'].sum(),
+                    '2024': df_sp[df_sp['Tipo'] == 'Passività Correnti']['2024'].sum(),
+                },
+                'Utile Netto': {
+                    '2023': get_val_by_tipo(df_sp, 'Utile Netto', '2023'),
+                    '2024': get_val_by_tipo(df_sp, 'Utile Netto', '2024'),
+                },
+                'Ricavi': {
+                    '2023': get_val(df_ce, "Totale Ricavi", 'Accum. 2023'),
+                    '2024': get_val(df_ce, "Totale Ricavi", 'Accum. 2024'),
+                },
+                'EBITDA': {
+                    '2023': get_val(df_ce, "EBITDA", 'Accum. 2023'),
+                    '2024': get_val(df_ce, "EBITDA", 'Accum. 2024'),
+                },
             }
             return dati
 
         valori = estrai_valori(df_sp, df)
 
         ratios = [
-    {
-        "Nome": "Current Ratio",
-        "Formula": "Attività Correnti / Passività Correnti",
-        "Valori": lambda d: (
-            d['Attività Correnti']['2023'] / d['Passività Correnti']['2023'],
-            d['Attività Correnti']['2024'] / d['Passività Correnti']['2024']
-        ),
-        "Range": "> 1.2"
-    },
-    {
-        "Nome": "Debt to Equity",
-        "Formula": "Debiti Finanziari / Patrimonio Netto",
-        "Valori": lambda d: (
-            d['Debiti Finanziari']['2023'] / d['Patrimonio Netto']['2023'],
-            d['Debiti Finanziari']['2024'] / d['Patrimonio Netto']['2024']
-        ),
-        "Range": "< 1.5"
-    },
-    {
-        "Nome": "Leverage",
-        "Formula": "Totale Attivo / Patrimonio Netto",
-        "Valori": lambda d: (
-            d['Totale Attivo']['2023'] / d['Patrimonio Netto']['2023'],
-            d['Totale Attivo']['2024'] / d['Patrimonio Netto']['2024']
-        ),
-        "Range": "< 2.0"
-    },
-    {
-        "Nome": "ROA",
-        "Formula": "Utile Netto / Totale Attivo",
-        "Valori": lambda d: (
-            d['Utile Netto']['2023'] / d['Totale Attivo']['2023'],
-            d['Utile Netto']['2024'] / d['Totale Attivo']['2024']
-        ),
-        "Range": "> 5%"
-    },
-    {
-        "Nome": "ROE",
-        "Formula": "Utile Netto / Patrimonio Netto",
-        "Valori": lambda d: (
-            d['Utile Netto']['2023'] / d['Patrimonio Netto']['2023'],
-            d['Utile Netto']['2024'] / d['Patrimonio Netto']['2024']
-        ),
-        "Range": "> 10%"
-    },
-    {
-        "Nome": "Copertura Debito",
-        "Formula": "EBITDA / Debiti Finanziari",
-        "Valori": lambda d: (
-            d['EBITDA']['2023'] / d['Debiti Finanziari']['2023'],
-            d['EBITDA']['2024'] / d['Debiti Finanziari']['2024']
-        ),
-        "Range": "> 2"
-    },
-]
+            {"Nome": "Current Ratio", "Formula": "Attività Correnti / Passività Correnti", "Valori": lambda d: (d['Attività Correnti']['2023'] / d['Passività Correnti']['2023'], d['Attività Correnti']['2024'] / d['Passività Correnti']['2024']), "Range": "> 1.2"},
+            {"Nome": "Debt to Equity", "Formula": "Debiti Finanziari / Patrimonio Netto", "Valori": lambda d: (d['Debiti Finanziari']['2023'] / d['Patrimonio Netto']['2023'], d['Debiti Finanziari']['2024'] / d['Patrimonio Netto']['2024']), "Range": "< 1.5"},
+            {"Nome": "Leverage", "Formula": "Totale Attivo / Patrimonio Netto", "Valori": lambda d: (d['Totale Attivo']['2023'] / d['Patrimonio Netto']['2023'], d['Totale Attivo']['2024'] / d['Patrimonio Netto']['2024']), "Range": "< 2.0"},
+            {"Nome": "ROA", "Formula": "Utile Netto / Totale Attivo", "Valori": lambda d: (d['Utile Netto']['2023'] / d['Totale Attivo']['2023'], d['Utile Netto']['2024'] / d['Totale Attivo']['2024']), "Range": "> 5%"},
+            {"Nome": "ROE", "Formula": "Utile Netto / Patrimonio Netto", "Valori": lambda d: (d['Utile Netto']['2023'] / d['Patrimonio Netto']['2023'], d['Utile Netto']['2024'] / d['Patrimonio Netto']['2024']), "Range": "> 10%"},
+            {"Nome": "Copertura Debito", "Formula": "EBITDA / Debiti Finanziari", "Valori": lambda d: (d['EBITDA']['2023'] / d['Debiti Finanziari']['2023'], d['EBITDA']['2024'] / d['Debiti Finanziari']['2024']), "Range": "> 2"},
+        ]
 
-        # Cálculo de ratios financieros
         def valuta(val, criterio):
             if ">" in criterio:
                 soglia = float(criterio.split(">")[1].strip().replace("%", ""))
@@ -176,31 +136,8 @@ if uploaded_file:
             except Exception:
                 continue
 
-        tabella_ratios = []
-
-        for r in ratios:
-            try:
-                val_2023, val_2024 = r["Valori"](valori)
-                valut_2023 = valuta(val_2023*100 if "%" in r["Range"] else val_2023, r["Range"])
-                valut_2024 = valuta(val_2024*100 if "%" in r["Range"] else val_2024, r["Range"])
-
-                tabella_ratios.append({
-                    "Indicatore": r["Nome"],
-                    "Formula": r["Formula"],
-                    "2023": round(val_2023*100, 1) if "%" in r["Range"] else round(val_2023, 2),
-                    "2024": round(val_2024*100, 1) if "%" in r["Range"] else round(val_2024, 2),
-                    "Range": r["Range"],
-                    "Valutazione 2023": valut_2023,
-                    "Valutazione 2024": valut_2024,
-                })
-            except Exception:
-                continue
-
         df_ratios = pd.DataFrame(tabella_ratios)
-        st.dataframe(df_ratios.style.format({
-            "2023": "{:,.2f}",
-            "2024": "{:,.2f}"
-        }), use_container_width=True)
+        st.dataframe(df_ratios.style.format({"2023": "{:,.2f}", "2024": "{:,.2f}"}), use_container_width=True)
 
         ratios_json = df_ratios.to_json(orient="records")
 
