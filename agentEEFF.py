@@ -62,10 +62,10 @@ if uploaded_file:
         cogs_2023 = abs(get_val(df, "Costo Merce", "Accum. 2023") + get_val(df, "Trasporto per Vendite", "Accum. 2023"))
         cogs_2024 = abs(get_val(df, "Costo Merce", "Accum. 2024") + get_val(df, "Trasporto per Vendite", "Accum. 2024"))
 
-        dso_2023 = get_val(df_sp, "Crediti vs Clienti", "2023") / ricavi_2023 * 365
-        dso_2024 = get_val(df_sp, "Crediti vs Clienti", "2024") / ricavi_2024 * 365
-        dpo_2023 = get_val(df_sp, "Debiti vs Fornitori", "2023") / cogs_2023 * 365
-        dpo_2024 = get_val(df_sp, "Debiti vs Fornitori", "2024") / cogs_2024 * 365
+        dso_2023 = get_val(df_sp, "Crediti v Clienti", "2023") / ricavi_2023 * 365
+        dso_2024 = get_val(df_sp, "Crediti v Clienti", "2024") / ricavi_2024 * 365
+        dpo_2023 = get_val(df_sp, "Debiti v Fornitori", "2023") / cogs_2023 * 365
+        dpo_2024 = get_val(df_sp, "Debiti v Fornitori", "2024") / cogs_2024 * 365
         dio_2023 = abs(get_val(df_sp, "Magazzino", "2023") / cogs_2023 * 365)
         dio_2024 = abs(get_val(df_sp, "Magazzino", "2024") / cogs_2024 * 365)
 
