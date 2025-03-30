@@ -50,15 +50,27 @@ if uploaded_file:
 
         st.subheader("📊 Indicatori Finanziari Chiave (2023 e 2024)")
 
-        def get_val_by_tipo(df, tipo, col):
-            match = df[df['Tipo'].str.lower().str.strip() == tipo.lower()]
-            return float(match[col].values[0]) if not match.empty else np.nan
-
-        def get_val(df, voce, col):
-            riga = df[df['Voce'].str.contains(voce, case=False, na=False)]
-            return float(riga[col].values[0]) if not riga.empty else np.nan
-
         def estrai_valori(df_sp, df_ce):
+            def get_val_by_tipo(df, tipo, col):
+                match = df[df['Tipo'].str.lower().str.strip() == tipo.lower()]
+                if match.empty:
+                    st.warning(f"⚠️ Tipo '{tipo}' no encontrado en Stato Patrimoniale.")
+                    return np.nan
+                val = match[col].sum()
+                if pd.isna(val):
+                    st.warning(f"⚠️ Valor nulo para '{tipo}' en columna {col}.")
+                return float(val)
+
+            def get_val_exact_voce(df, voce_exact, col):
+                match = df[df['Voce'].str.strip().str.lower() == voce_exact.lower()]
+                if match.empty:
+                    st.warning(f"⚠️ Línea exacta '{voce_exact}' no encontrada en Conto Economico.")
+                    return np.nan
+                val = match[col].values[0]
+                if pd.isna(val):
+                    st.warning(f"⚠️ Valor nulo en '{voce_exact}' ({col})")
+                return float(val)
+
             dati = {
                 'Totale Attivo': {
                     '2023': get_val_by_tipo(df_sp, 'Totale Attivo', '2023'),
@@ -85,14 +97,15 @@ if uploaded_file:
                     '2024': get_val_by_tipo(df_sp, 'Utile Netto', '2024'),
                 },
                 'Ricavi': {
-                    '2023': get_val(df_ce, "Totale Ricavi", 'Accum. 2023'),
-                    '2024': get_val(df_ce, "Totale Ricavi", 'Accum. 2024'),
+                    '2023': get_val_exact_voce(df_ce, 'Totale Ricavi', 'Accum. 2023'),
+                    '2024': get_val_exact_voce(df_ce, 'Totale Ricavi', 'Accum. 2024'),
                 },
                 'EBITDA': {
-                    '2023': get_val(df_ce, "EBITDA", 'Accum. 2023'),
-                    '2024': get_val(df_ce, "EBITDA", 'Accum. 2024'),
+                    '2023': get_val_exact_voce(df_ce, 'ebitda', 'Accum. 2023'),
+                    '2024': get_val_exact_voce(df_ce, 'ebitda', 'Accum. 2024'),
                 },
             }
+
             return dati
 
         valori = estrai_valori(df_sp, df)
