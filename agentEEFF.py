@@ -6,18 +6,15 @@ import os
 from dotenv import load_dotenv
 from groq import Groq
 
-# 🎯 Configuración de la app
 st.set_page_config(page_title="Analisi Conto Economico", page_icon="📊", layout="wide")
 st.title("📊 Analisi Conto Economico vs Budget")
 
-# 🔐 Cargar clave API
 load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if not GROQ_API_KEY:
     st.error("🚨 API Key is missing! Set it in .env or en Streamlit Secrets.")
     st.stop()
 
-# 📂 Subida de archivo
 uploaded_file = st.file_uploader("📁 Sube el archivo Conto_Economico_Analisis.xlsx", type=["xlsx"])
 if uploaded_file:
     try:
@@ -95,72 +92,32 @@ if uploaded_file:
             'EBITDA': {'2023': get_val_voce(df, 'ebitda', 'Accum. 2023'), '2024': get_val_voce(df, 'ebitda', 'Accum. 2024')},
         }
 
-        ratios = [
-            {"Nome": "Current Ratio", "Formula": "Att. Correnti / Pass. Correnti", "Valori": lambda d: (d['Attività Correnti']['2023'] / d['Passività Correnti']['2023'], d['Attività Correnti']['2024'] / d['Passività Correnti']['2024']), "Range": "> 1.2"},
-            {"Nome": "Acid Test", "Formula": "(Att. Correnti - Magazzino) / Pass. Correnti", "Valori": lambda d: ((d['Attività Correnti']['2023'] - get_val(df_sp, "Magazzino", "2023")) / d['Passività Correnti']['2023'], (d['Attività Correnti']['2024'] - get_val(df_sp, "Magazzino", "2024")) / d['Passività Correnti']['2024']), "Range": "> 1"},
-            {"Nome": "Debt to Equity", "Formula": "Debiti Fin. / Patrimonio Netto", "Valori": lambda d: (d['Debiti Finanziari']['2023'] / d['Patrimonio Netto']['2023'], d['Debiti Finanziari']['2024'] / d['Patrimonio Netto']['2024']), "Range": "< 1.5"},
-            {"Nome": "Leverage", "Formula": "Totale Attivo / Patrimonio Netto", "Valori": lambda d: (d['Totale Attivo']['2023'] / d['Patrimonio Netto']['2023'], d['Totale Attivo']['2024'] / d['Patrimonio Netto']['2024']), "Range": "< 2.0"},
-            {"Nome": "ROA", "Formula": "Utile Netto / Totale Attivo", "Valori": lambda d: (d['Utile Netto']['2023'] / d['Totale Attivo']['2023'], d['Utile Netto']['2024'] / d['Totale Attivo']['2024']), "Range": "> 5%"},
-            {"Nome": "ROE", "Formula": "Utile Netto / Patrimonio Netto", "Valori": lambda d: (d['Utile Netto']['2023'] / d['Patrimonio Netto']['2023'], d['Utile Netto']['2024'] / d['Patrimonio Netto']['2024']), "Range": "> 10%"},
-            {"Nome": "Copertura Debito", "Formula": "EBITDA / Debiti Finanziari", "Valori": lambda d: (d['EBITDA']['2023'] / d['Debiti Finanziari']['2023'], d['EBITDA']['2024'] / d['Debiti Finanziari']['2024']), "Range": "> 2"},
-        ]
+        # Rangos con umbrales triple (verde, naranja, rojo)
+        semaforo_rules = {
+            "Current Ratio": (1.2, 1.5),
+            "Acid Test": (1.0, 1.3),
+            "Debt to Equity": (1.5, 2.0),
+            "Leverage": (2.0, 2.5),
+            "ROA": (5, 8),
+            "ROE": (10, 15),
+            "Copertura Debito": (2, 3)
+        }
 
-        def valuta(val, criterio):
-            if ">" in criterio:
-                soglia = float(criterio.split(">")[1].strip().replace("%", ""))
-                return "🟢" if val > soglia else "🔴"
-            elif "<" in criterio:
-                soglia = float(criterio.split("<")[1].strip().replace("%", ""))
-                return "🟢" if val < soglia else "🔴"
-            return "⚪️"
+        def valuta_tricolor(val, low, high, invert=False):
+            if pd.isna(val):
+                return "⚪"
+            if invert:
+                return "🟢" if val < low else "🟠" if val < high else "🔴"
+            else:
+                return "🔴" if val < low else "🟠" if val < high else "🟢"
 
-        df_ratios = pd.DataFrame([{
-            "Indicatore": r["Nome"],
-            "Formula": r["Formula"],
-            "2023": round(r["Valori"](valori)[0] * 100, 1) if "%" in r["Range"] else round(r["Valori"](valori)[0], 2),
-            "2024": round(r["Valori"](valori)[1] * 100, 1) if "%" in r["Range"] else round(r["Valori"](valori)[1], 2),
-            "Range": r["Range"],
-            "Valutazione 2023": valuta(r["Valori"](valori)[0] * 100 if "%" in r["Range"] else r["Valori"](valori)[0], r["Range"]),
-            "Valutazione 2024": valuta(r["Valori"](valori)[1] * 100 if "%" in r["Range"] else r["Valori"](valori)[1], r["Range"])
-        } for r in ratios])
-
-        st.dataframe(df_ratios, use_container_width=True)
-
-        ratios_json = df_ratios.to_json(orient="records")
-        df_prompt = df[['Voce', 'Accum. 2023', 'Accum. 2024', 'Budget 2024', 'Δ vs 2023', 'Δ vs Budget']].copy()
-        data_json = df_prompt.to_json(orient="records")
-
-        prompt = f"""
-Sei un analista finanziario senior. Analizza il seguente conto economico che confronta i risultati del 2024 con quelli del 2023 e con il budget.
-Compiti:
-- Identifica le variazioni più rilevanti.
-- Commenta i trend positivi o negativi.
-- Rileva eventuali superamenti del budget o sottoperformance.
-- Analizza i principali indicatori finanziari calcolati.
-- Suggerisci azioni correttive o interpretazioni strategiche.
-
-Conto Economico (JSON):
-{data_json}
-
-Indicatori Finanziari (JSON):
-{ratios_json}
-"""
-
-        st.subheader("🧠 Comentario automatico di analisi FP&A")
-
-        client = Groq(api_key=GROQ_API_KEY)
-        response = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": "Sei un esperto in controllo di gestione e FP&A."},
-                {"role": "user", "content": prompt}
-            ],
-            model="llama3-8b-8192",
-        )
-
-        st.markdown(response.choices[0].message.content)
+        df_ratios = []
+        for nome, (soglia_bassa, soglia_media) in semaforo_rules.items():
+            is_percent = nome in ["ROA", "ROE"]
+            invert = nome in ["Debt to Equity", "Leverage"]
+            val_2023 = round(valori[nome.split()[0]]["2023"] / valori[nome.split()[-1]]["2023"], 4) if " " in nome else 0
+            val_2024 = round(valori[nome.split()[0]]["2024"] / valori[nome.split()[-1]]["2024"], 4) if " " in nome else 0
+        # Este bloque se completará según lo que quieras calcular...
 
     except Exception as e:
         st.error(f"Error al procesar el archivo: {e}")
-
-
-
